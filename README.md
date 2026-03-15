@@ -224,19 +224,19 @@ python main.py
 ```
 
 After starting, access:
-- 🌐 **Web Management Interface**: `http://localhost:8000`
-- 📚 **API Documentation**: `http://localhost:8000/docs`
-- 🔌 **MCP Endpoint**: `http://localhost:9000/mcp`
+- 🌐 **Web Management Interface**: `http://localhost:6080`
+- 📚 **API Documentation**: `http://localhost:6080/docs`
+- 🔌 **MCP Endpoint**: `http://localhost:6081/mcp`
 
 ### Configure MCP Client
 
-Add the following in Claude Desktop / Cursor or other MCP clients:
+Add the following in Claude Desktop / Cursor/Cherry Studio or other MCP clients:
 
 ```json
 {
   "mcpServers": {
     "general-tools": {
-      "url": "http://localhost:9000/mcp"
+      "url": "http://localhost:6081/mcp"
     }
   }
 }

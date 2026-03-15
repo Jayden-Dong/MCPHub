@@ -223,19 +223,19 @@ python main.py
 ```
 
 启动后访问：
-- 🌐 **Web 管理界面**：`http://localhost:8000`
-- 📚 **API 文档**：`http://localhost:8000/docs`
-- 🔌 **MCP 服务端点**：`http://localhost:9000/mcp`
+- 🌐 **Web 管理界面**：`http://localhost:6080`
+- 📚 **API 文档**：`http://localhost:6080/docs`
+- 🔌 **MCP 服务端点**：`http://localhost:6081/mcp`
 
 ### 配置 MCP 客户端
 
-在 Claude Desktop / Cursor 等 MCP 客户端中添加：
+在 Claude Desktop / Cursor/Cherry Studio 等 MCP 客户端中添加：
 
 ```json
 {
   "mcpServers": {
     "general-tools": {
-      "url": "http://localhost:9000/mcp"
+      "url": "http://localhost:6081/mcp"
     }
   }
 }
