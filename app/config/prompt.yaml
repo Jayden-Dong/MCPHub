@@ -1,0 +1,405 @@
+read_file_utf8: |
+  以UTF-8编码方式读取指定文件内容。如果文件不在本地，需要先下载到本地。
+
+  Args:
+      file_path: 文件路径。如果文件不在本地，需要先下载。
+
+  Returns:
+      包含读取结果信息的字典：
+          - success: 是否读取成功
+          - content: 文件内容（成功时为文件内容，失败时为None）
+          - error: 错误信息（成功时为None）
+
+write_file_utf8: |
+  以UTF-8编码方式将内容写入指定文件。
+
+  Args:
+      content: 要写入的文件内容。
+      file_name: 文件名（不含路径，将保存在配置指定的下载目录中）。
+
+  Returns:
+      包含写入结果信息的字典：
+          - success: 是否写入成功
+          - file_path: 写入文件的绝对路径（成功时返回）
+          - error: 错误信息（成功时为None）
+  
+
+unzip: |
+  解压zip文件到指定目录。
+
+  Args:
+      zip_file_path: zip文件路径。
+
+  Returns:
+      包含解压结果信息的字典：
+          - success: 是否解压成功
+          - error: 错误信息（成功时为None）
+          - files: 解压后的文件路径列表（成功时为文件路径列表，失败时为None）
+
+sort_by_evalue_and_filter: |
+  对Foldseek --format-mode 4的csv结果文件根据evalue从小到大排序，并只保留指定条数的数据。
+  每条数据只保留query, target, evalue, bits, fident五个字段。
+
+  参数:
+      input_file_path: 输入的Foldseek结果文件路径
+      top_n: 需要保留的数据条数
+      reverse: False-从小到大排序；True-从大到小排序
+  返回:
+      包含处理结果信息的字典，包含data字段，其中是筛选后的数据列表
+      每个数据项为字典，包含query, target, evalue, bits, fident五个字段
+
+sort_by_fident_and_filter: |
+  对Foldseek --format-mode 4的csv结果文件根据fident从大到小排序，并只保留指定条数的数据。
+  每条数据只保留query, target, evalue, bits, fident五个字段。
+
+  参数:
+      input_file_path: 输入的Foldseek结果文件路径
+      top_n: 需要保留的数据条数
+      reverse: False-从小到大排序；True-从大到小排序
+  返回:
+      包含处理结果信息的字典，包含data字段，其中是筛选后的数据列表
+      每个数据项为字典，包含query, target, evalue, bits, fident五个字段
+
+upload_file: |
+  通过FTP上传文件到指定目录。
+
+  参数:
+      user_id: 用户ID，用于在FTP服务器上创建用户专属目录
+      local_file_path: 本地要上传的文件的完整路径
+
+  返回:
+      包含上传结果信息的字典
+
+download_file: |
+  从FTP下载文件或文件夹到本地。
+
+  - 若remote_path是文件: 直接下载到local_save_dir。
+  - 若remote_path是目录: 先递归下载到临时目录，再在local_save_dir打包为zip(默认)或tar。
+
+  参数:
+      remote_path: 远程路径；支持绝对路径（以/开头）或相对于FTP_BASE_DIR的相对路径
+      archive_format: 当为目录时的打包格式，'zip'或'tar'，默认'zip'
+  返回:
+      字典，包含success、message、local_path、is_directory、archive_format等
+
+create_directory: |
+  在FTP服务器上创建目录。
+      支持创建多级目录，自动处理绝对路径和相对路径。
+
+      参数:
+          remote_path: 要创建的远程目录路径；支持绝对路径（以/开头）或相对于FTP_BASE_DIR的相对路径
+
+      返回:
+          字典，包含success状态和message信息
+
+move_file: |
+  在FTP服务器上移动文件。
+  支持绝对路径和相对路径，自动处理目标目录的创建。
+
+  参数:
+      source_path: 源文件路径；支持绝对路径（以/开头）或相对于FTP_BASE_DIR的相对路径
+      destination_path: 目标路径；支持绝对路径（以/开头）或相对于FTP_BASE_DIR的相对路径
+
+  返回:
+      字典，包含success状态和message信息
+
+sleep: |
+  等待指定时长。可以实现间隔轮询、等待等任务。
+
+  Args:
+      space:  等待的时长，小于 60，单位：秒。 
+  
+
+download_structure: |
+  从指定的PDB相关网址下载结构文件。
+
+  参数:
+      url: pdb文件下载链接，支持多个网址，包含RCSB与PDBe。当某个下载失败时，可以切换另外一个下载。
+      注意：如果是AlphaFold预测的结构，默认先使用v4版本。如果是由于文件不存在导致下载，可以尝试使用v6版本。
+
+  返回:
+      字典，包含success、error、file_path。
+
+convert_cif_to_pdb: |
+  将CIF文件转换为PDB文件格式。
+
+  参数:
+      cif_file_path: CIF文件的路径。
+
+  返回:
+      字典，包含以下键值对：
+      - success: 是否转换成功（布尔值）
+      - error: 失败原因（字符串，成功时为None）
+      - file_path: 生成的PDB文件的绝对路径（字符串，失败时为None）
+      - machine_code: 文件所在机器的机器码
+
+save_python_script: |
+  保存Python脚本到指定文件路径。
+
+  Args:
+      file_name: 保存文件的名称，不包含路径。
+      script_content: 脚本内容，python解释器的版本是>=3.10。
+
+  Returns:
+      包含保存结果信息的字典：
+          - success: 是否保存成功
+          - error: 错误信息（成功时为None）
+
+run_python_script: |
+  编写python脚本，并运行Python脚本。适用于耗时少于3分钟的任务。
+  如果需要按已知顺序调用MCP工具的情况，或者需要反复等待工具运行完成的情况，可以使用这种方式能够节省非常多的上下文，脚本只需要输出重要数据和结论就可以。比如：现在需要先调用A工具，将结果输入B工具，那么就可以使用这种方式。
+  示例：
+  from shimao_mcp_client import call_tool_by_http_streamable # 导入mcp工具调用模块
+  toolA_url = "http://127.0.0.1:6061/mcp" # MCP Server URL
+  tool_name = "toolA" # 工具名称
+  input = {} # 输入参数，根据实际情况输入
+  toolA_result = call_tool_by_http_streamable(toolA_url, "toolA", input)
+  
+  tool_name = "toolB"
+  toolB_result = call_tool_by_http_streamable(toolB_url, tool_name, toolA_result)
+
+  Args:
+    script_content: 脚本内容，python解释器的版本是>=3.10。
+    file_name: 保存文件的名称，不包含路径。
+
+  Returns:
+      包含运行结果信息的字典：
+          - success: 是否运行成功
+          - output: 脚本输出
+          - error: 错误信息（成功时为None）
+
+install_package: |
+  通过pip安装指定的Python包。
+
+  Args:
+    package_name: 要安装的包名，可附带版本号，如 "requests" 或 "numpy==1.21.0"
+
+  Returns:
+     包含安装结果信息的字典：
+         - success: 是否安装成功
+         - message: 安装过程的输出或错误信息
+
+run_python_script_async: |
+  编写python脚本，并异步运行Python脚本，适用于长任务的情况。
+  如果需要按已知顺序调用MCP工具的情况，或者需要反复等待工具运行完成的情况，可以使用这种方式能够节省非常多的上下文，脚本只需要输出重要数据和结论就可以。比如：现在需要先调用A工具，将结果输入B工具，那么就可以使用这种方式。
+  示例：
+  from shimao_mcp_client import call_tool_by_http_streamable # 导入mcp工具调用模块
+  toolA_url = "http://127.0.0.1:6061/mcp" # MCP Server URL
+  tool_name = "toolA" # 工具名称
+  input = {} # 输入参数，根据实际情况输入
+  toolA_result = call_tool_by_http_streamable(toolA_url, "toolA", input)
+  
+  tool_name = "toolB"
+  toolB_result = call_tool_by_http_streamable(toolB_url, tool_name, toolA_result)
+
+  Args:
+    script_content: 脚本内容，python解释器的版本是>=3.10。
+    file_name: 保存文件的名称，不包含路径。
+
+  Returns:
+      包含运行结果信息的字典：
+          - success: 是否启动成功
+          - sessionId: 脚本执行会话ID
+          - error: 错误信息（成功时为None）
+
+get_script_status: |
+  根据sessionId查询脚本运行状态。
+
+  Args:
+    session_id: 脚本执行会话ID。
+
+  Returns:
+      包含执行状态信息的字典：
+          - status: 执行状态（running, success, failed）
+          - output: 脚本输出（仅当执行完成时）
+          - error: 错误信息（仅当执行失败时）
+
+add_note: |
+  可以用来记笔记。此工具会自动生成笔记记录的时间。
+
+  Args:
+      note: 要添加的笔记内容，使用markdown格式。
+      note_file_name: 笔记本名称。
+
+  Returns:
+      str: JSON格式字符串，包含success、note_content、err_msg字段。
+          - success: 布尔值，表示添加是否成功
+          - err_msg: 失败时返回失败原因，成功时返回空字符串
+
+read_note: |
+  查阅指定文件中的笔记。
+
+  Args:
+      note_file_name: 笔记本名称。
+
+  Returns:
+      str: JSON格式字符串，包含success、note_content、err_msg字段。
+          - success: 布尔值，表示读取是否成功
+          - note_content: 成功时返回笔记内容，失败时返回空字符串
+          - err_msg: 失败时返回失败原因，成功时返回空字符串
+
+autogui_start_task: |
+  启动一个GUI自动化任务，任务在后台异步执行。
+  Agent会不断截图、分析当前屏幕状态，并通过鼠标/键盘操作完成任务。
+  启动后可通过 autogui_get_status 查询进度，autogui_stop_task 停止任务。
+  同一时刻只能运行一个任务。
+
+  Args:
+      task: 自然语言描述的任务内容，例如"打开Chrome浏览器并访问百度"。
+
+  Returns:
+      dict: 包含success、err_msg字段。
+          - success: 布尔值，表示是否成功启动
+          - err_msg: 失败时返回失败原因（如已有任务在运行），成功时返回空字符串
+
+autogui_get_status: |
+  获取当前GUI自动化任务的运行状态。
+
+  Returns:
+      dict: 包含success、data、err_msg字段。
+          - success: 始终为True
+          - data: 状态详情，包含以下字段：
+              - tool_status: 工具层状态（idle/running/finished/error）
+              - task: 当前任务描述
+              - current_step: 当前执行步骤数
+              - max_steps: 最大允许步骤数
+              - is_running: Agent是否仍在运行
+              - is_finished: Agent是否已完成任务
+              - finish_message: 任务完成时的结束消息
+              - error_msg: 发生错误时的错误信息
+          - err_msg: 空字符串
+
+autogui_get_history: |
+  获取当前GUI自动化任务的完整执行历史，包含每一步的思考过程和操作。
+
+  Returns:
+      dict: 包含success、data、err_msg字段。
+          - success: 始终为True
+          - data: 步骤记录列表，每项包含：
+              - step_number: 步骤编号
+              - thought: LLM的推理过程
+              - action: 执行的动作（含type及相关参数）
+              - success: 该步骤是否执行成功
+              - error: 失败时的错误信息
+              - screenshot_path: 该步骤截图的本地路径
+          - err_msg: 空字符串
+
+autogui_stop_task: |
+  停止当前正在运行的GUI自动化任务。
+
+  Returns:
+      dict: 包含success、err_msg字段。
+          - success: 布尔值，表示是否成功停止
+          - err_msg: 失败时返回失败原因（如当前无任务运行），成功时返回空字符串
+
+run_cli_command: |
+  在当前系统执行命令行指令，自动适配 Windows / macOS / Linux 环境。
+  建议用于执行单条明确的命令，复杂逻辑请使用 run_python_script。
+
+  Args:
+      command: 要执行的命令字符串。
+      timeout: 超时时间（秒），默认 30。
+      work_dir: 工作目录路径，为空则使用服务的当前目录。
+
+  Returns:
+      包含执行结果的字典：
+          - success: 是否执行成功（returncode == 0）
+          - stdout: 标准输出内容
+          - stderr: 标准错误内容
+          - returncode: 进程退出码
+
+list_directory: |
+  列出指定目录的文件和子目录。自动适配 Windows（dir）/ macOS & Linux（ls -la）。
+
+  Args:
+      path: 要列出的目录路径，默认为当前目录（"."）。
+
+  Returns:
+      包含执行结果的字典：
+          - success: 是否成功
+          - stdout: 目录列表内容
+          - stderr: 错误信息
+
+get_system_info: |
+  获取当前系统的基本信息。
+  Windows 使用 systeminfo，macOS 使用 sw_vers + uname，Linux 使用 uname + os-release。
+
+  Returns:
+      包含执行结果的字典：
+          - success: 是否成功
+          - stdout: 系统信息文本
+          - stderr: 错误信息
+
+get_disk_usage: |
+  获取磁盘分区的使用情况。
+  Windows 使用 wmic logicaldisk，macOS / Linux 使用 df -h。
+
+  Returns:
+      包含执行结果的字典：
+          - success: 是否成功
+          - stdout: 磁盘使用信息文本
+          - stderr: 错误信息
+
+get_running_processes: |
+  获取当前系统正在运行的进程列表。
+  Windows 使用 tasklist，macOS / Linux 使用 ps aux。
+
+  Args:
+      filter_name: 进程名称关键词，用于过滤结果。为空则返回全部进程。
+
+  Returns:
+      包含执行结果的字典：
+          - success: 是否成功
+          - stdout: 进程列表文本
+          - stderr: 错误信息
+
+get_network_info: |
+  获取当前系统的网络接口配置信息。
+  Windows 使用 ipconfig /all，macOS 使用 ifconfig，Linux 优先使用 ip addr show。
+
+  Returns:
+      包含执行结果的字典：
+          - success: 是否成功
+          - stdout: 网络配置信息文本
+          - stderr: 错误信息
+
+find_files: |
+  在指定目录下递归搜索匹配的文件。
+  Windows 使用 dir /s /b，macOS / Linux 使用 find。
+
+  Args:
+      search_dir: 搜索的起始目录，默认为当前目录（"."）。
+      pattern: 文件名匹配模式，支持通配符，如 "*.py"、"*.log"，默认为 "*"。
+
+  Returns:
+      包含执行结果的字典：
+          - success: 是否成功
+          - stdout: 匹配的文件路径列表（每行一个）
+          - stderr: 错误信息
+
+kill_process: |
+  强制终止指定 PID 的进程。
+  Windows 使用 taskkill /F /PID，macOS / Linux 使用 kill -9。
+  注意：此操作不可恢复，请确认 PID 正确后再执行。
+
+  Args:
+      pid: 要终止的进程 ID（正整数）。
+
+  Returns:
+      包含执行结果的字典：
+          - success: 是否成功终止
+          - stdout: 命令输出
+          - stderr: 错误信息
+
+get_env_vars: |
+  获取当前进程的环境变量。
+  Windows 使用 set，macOS / Linux 使用 env。
+
+  Args:
+      filter_prefix: 按变量名前缀过滤，如 "PATH"、"PYTHON"。为空则返回全部环境变量。
+
+  Returns:
+      包含执行结果的字典：
+          - success: 是否成功
+          - stdout: 环境变量列表（每行一个，格式为 KEY=VALUE）
+          - stderr: 错误信息

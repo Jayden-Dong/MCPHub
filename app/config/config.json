@@ -1,0 +1,97 @@
+{
+  "api": {
+    "title": "general mcp tool server",
+    "version": "1.0.0",
+    "description": "A service for running general tools"
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 6080,
+    "white_list": [
+      "172.16.211.15",
+      "127.0.0.1",
+      "172.16.208.20"
+    ]
+  },
+  "mcp": {
+    "service_name": "General MCP Tool",
+    "host": "0.0.0.0",
+    "port": 6081,
+    "path": "",
+    "white_list": [
+      "172.16.211.15",
+      "127.0.0.1"
+    ],
+    "prompt_file": "./config/prompt.yaml",
+    "tool_name_prefix": "ComputerA_",
+    "module_enable": [
+      {
+        "enable": true,
+        "module_name": "tools.t_python.python_mcp",
+        "disable_tool": [],
+        "config": {
+          "python_script_dir": "./python_scripts"
+        }
+      },
+      {
+        "enable": true,
+        "module_name": "tools.t_other.other_mcp",
+        "disable_tool": [
+          "add_note",
+          "read_note"
+        ]
+      },
+      {
+        "enable": true,
+        "module_name": "tools.t_notebook.notebook_mcp",
+        "disable_tool": [],
+        "config": {
+          "note_dir": "./notes"
+        }
+      },
+      {
+        "enable": true,
+        "module_name": "tools.t_autogui.autogui_mcp",
+        "disable_tool": [],
+        "config": {
+          "llm_api_key": "sk-16aa954889394a6cb501aa455d2xxxxx",
+          "llm_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+          "model_name": "qwen3.5-plus",
+          "max_steps": 50,
+          "screenshot_delay": 1.0,
+          "llm_temperature": 0.1,
+          "llm_max_tokens": 1024
+        }
+      },
+      {
+        "enable": true,
+        "module_name": "tools.t_cli.cli_mcp",
+        "disable_tool": [],
+        "config": {
+            "timeout_default": 30,
+            "enable_dangerous_check": true,
+            "custom_blacklist": []
+        }
+      }
+    ]
+  },
+  "log": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": "../logs/log.log",
+    "backup_count": 30
+  },
+  "mcp_log": {
+    "level": "INFO",
+    "file": "../logs/mcp.log",
+    "backup_count": 30
+  },
+  "database": {
+    "db_path": "./config/mcp_hub.db"
+  },
+  "auth": {
+    "secret_key": "mcp-hub-jwt-secret-key-2024-please-change-in-production",
+    "token_expire_hours": 24,
+    "algorithm": "HS256"
+  }
+}
