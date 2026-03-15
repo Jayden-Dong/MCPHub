@@ -21,43 +21,42 @@
 ## 📸 系统截图
 
 ### 登录界面
-
-![image-20260315151155430](C:\Users\22321\AppData\Roaming\Typora\typora-user-images\image-20260315151155430.png)
+![Image text](https://github.com/Jayden-Dong/MCPHub/blob/213b5ea070cae4fdf584b6f441f1aed7525a95db/img/login.png)
 
 
 > 初始账号：admin，初始密码：admin123
 
 ### 模块管理界面
 
-![image-20260315145604443](C:\Users\22321\AppData\Roaming\Typora\typora-user-images\image-20260315145604443.png)
+![Image text](https://github.com/Jayden-Dong/MCPHub/blob/213b5ea070cae4fdf584b6f441f1aed7525a95db/img/modules.png)
 
 
 > 管理所有 MCP 模块，支持加载、卸载、重载操作
 
 ### 工具详情与控制
 
-![image-20260315145637537](C:\Users\22321\AppData\Roaming\Typora\typora-user-images\image-20260315145637537.png)
+![Image text](https://github.com/Jayden-Dong/MCPHub/blob/213b5ea070cae4fdf584b6f441f1aed7525a95db/img/tool%20detail.png)
 
 
 > 单独启用/禁用每个工具，实时编辑工具描述
 
 ### 代理服务器管理
 
-![image-20260315150834117](C:\Users\22321\AppData\Roaming\Typora\typora-user-images\image-20260315150834117.png)
+![Image text](https://github.com/Jayden-Dong/MCPHub/blob/213b5ea070cae4fdf584b6f441f1aed7525a95db/img/extended%20mcp.png)
 
 
 > 代理现有 MCP Server，无需改造即可接入
 
 ### 使用统计看板
 
-![image-20260315145719510](C:\Users\22321\AppData\Roaming\Typora\typora-user-images\image-20260315145719510.png)
+![Image text](https://github.com/Jayden-Dong/MCPHub/blob/213b5ea070cae4fdf584b6f441f1aed7525a95db/img/statistics.png)
 
 
 > 可视化展示工具调用次数、成功率、响应时间
 
 ### AI 代码生成
 
-![image-20260315150804432](C:\Users\22321\AppData\Roaming\Typora\typora-user-images\image-20260315150804432.png)
+![Image text](https://github.com/Jayden-Dong/MCPHub/blob/213b5ea070cae4fdf584b6f441f1aed7525a95db/img/ai%20coding.png)
 
 
 > 通过自然语言对话生成 MCP 插件代码
