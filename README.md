@@ -83,16 +83,16 @@
 │  - ... (configuration explosion)                                │
 └─────────────────────────────────────────────────────────────────┘
                               ⬇️
-┌─────────────────────────────────────────────────────────────────┐
-│                    After: Unified Entry Point                    │
-│  Claude/Cursor only needs to configure one address              │
-│  { "mcpServers": { "mcp-hub": { "url": "http://host:9000/mcp" } } } │
-│                                                                 │
-│  MCP Hub automatically aggregates all tools, providing:         │
-│  ✅ Centralized tool management                                 │
-│  ✅ Hot-pluggable enable/disable                                │
-│  ✅ Unified monitoring and statistics                           │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                    After: Unified Entry Point                       
+│  Claude/Cursor only needs to configure one address                  
+│  { "mcpServers": { "mcp-hub": { "url": "http://host:9000/mcp" } } } 
+│                                                                     
+│  MCP Hub automatically aggregates all tools, providing:             
+│  ✅ Centralized tool management                                     
+│  ✅ Hot-pluggable enable/disable                                    
+│  ✅ Unified monitoring and statistics                               
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -253,14 +253,14 @@ Add the following in Claude Desktop / Cursor or other MCP clients:
 Manage modules through the Web interface or API:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Module List              [Scan New Modules] [Install]   │
-├─────────────────────────────────────────────────────────┤
-│  ✅ t_cli        Loaded      [Details] [Reload] [Unload]│
-│  ✅ t_python     Loaded      [Details] [Reload] [Unload]│
-│  ⏸️ t_autogui    Paused      [Details] [Load]           │
-│  📦 t_weather    Not Loaded  [Details] [Load]    [Export]│
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│  Module List              [Scan New Modules] [Install]    
+├───────────────────────────────────────────────────────────┤
+│  ✅ t_cli        Loaded      [Details] [Reload] [Unload]  
+│  ✅ t_python     Loaded      [Details] [Reload] [Unload]  
+│  ⏸️ t_autogui    Paused      [Details] [Load]             
+│  📦 t_weather    Not Loaded  [Details] [Load]    [Export] 
+└───────────────────────────────────────────────────────────┘
 ```
 
 ### Tool-level Control
@@ -269,12 +269,12 @@ Enter module details to enable/disable each tool individually:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  t_cli Module Details                                    │
+│  t_cli Module Details                                   
 ├─────────────────────────────────────────────────────────┤
-│  🔧 run_cli_command      [✅ Enabled]                    │
-│  🔧 list_directory       [✅ Enabled]                    │
-│  🔧 get_system_info      [❌ Disabled]                   │
-│  🔧 kill_process         [❌ Disabled]  ⚠️ Dangerous      │
+│  🔧 run_cli_command      [✅ Enabled]                   
+│  🔧 list_directory       [✅ Enabled]                   
+│  🔧 get_system_info      [❌ Disabled]                  
+│  🔧 kill_process         [❌ Disabled]  ⚠️ Dangerous      
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -459,39 +459,39 @@ curl -X POST http://localhost:8000/api/modules/install \
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    MCP Client (Claude / Cursor)                  │
+│                    MCP Client (Claude / Cursor)                 │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │ MCP Protocol (HTTP Streamable)
                                 ▼ :9000
 ┌─────────────────────────────────────────────────────────────────┐
-│                    MCP Service (FastMCP)                         │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │  Middleware Layer                                          │  │
-│  │  • RequestMCPMiddleware (logging/statistics)               │  │
-│  │  • ToolDescriptionCheckerMiddleware (description hot update)│  │
-│  │  • ToolEnabledCheckerMiddleware (tool filtering)           │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │  Built-in   │  │  External   │  │  Proxy      │              │
-│  │  Tools      │  │  Plugins    │  │  Tools      │              │
-│  │  tools/     │  │  external/  │  │  proxy/     │              │
-│  └─────────────┘  └─────────────┘  └─────────────┘              │
+│                    MCP Service (FastMCP)                        
+│  ┌───────────────────────────────────────────────────────────┐ 
+│  │  Middleware Layer                                          
+│  │  • RequestMCPMiddleware (logging/statistics)               
+│  │  • ToolDescriptionCheckerMiddleware (description hot update)
+│  │  • ToolEnabledCheckerMiddleware (tool filtering)          
+│  └───────────────────────────────────────────────────────────┘  
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              
+│  │  Built-in   │  │  External   │  │  Proxy      │              
+│  │  Tools      │  │  Plugins    │  │  Tools      │              
+│  │  tools/     │  │  external/  │  │  proxy/     │              
+│  └─────────────┘  └─────────────┘  └─────────────┘              
 └─────────────────────────────────────────────────────────────────┘
                                 │
 ┌─────────────────────────────────────────────────────────────────┐
-│                    REST API (FastAPI) :8000                      │
+│                    REST API (FastAPI) :8000                     │
 │  /api/modules  /api/stats  /api/proxy  /api/codegen  /api/auth  │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Web Frontend (Vue 3)                          │
-│  Module Management | Tool Control | Proxy Config | Statistics  │
+│                    Web Frontend (Vue 3)                         │
+│  Module Management | Tool Control | Proxy Config | Statistics   │
 └─────────────────────────────────────────────────────────────────┘
                                 │
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Data Layer (SQLite)                            │
-│  Module Status | Tool Config | Call Statistics | Proxy Config  │
-│  User Authentication                                             │
+│                    Data Layer (SQLite)                          │
+│  Module Status | Tool Config | Call Statistics | Proxy Config   │
+│  User Authentication                                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
