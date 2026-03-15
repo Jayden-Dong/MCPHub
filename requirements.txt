@@ -108,12 +108,12 @@ importlib_metadata==8.7.1
 # Optional Features (Not in current venv)
 # Uncomment if needed:
 # ========================================
-# openai>=1.0.0              # For LLM client (autogui)
-# streamlit>=1.30.0          # For UI (autogui)
-# pyautogui>=0.9.50          # For GUI automation
-# Pillow>=10.0.0             # For image processing
-# joblib>=1.3.0              # For ML model loading
-# sqlmodel>=0.0.16           # For database ORM
-# psycopg2-binary>=2.9.0     # For PostgreSQL
-# python-jose[cryptography]  # For JWT authentication
-# passlib[bcrypt]            # For password hashing
+openai>=1.0.0              # For LLM client (autogui)
+streamlit>=1.30.0          # For UI (autogui)
+pyautogui>=0.9.50          # For GUI automation
+Pillow>=10.0.0             # For image processing
+joblib>=1.3.0              # For ML model loading
+sqlmodel>=0.0.16           # For database ORM
+psycopg2-binary>=2.9.0     # For PostgreSQL
+python-jose[cryptography]  # For JWT authentication
+passlib[bcrypt]            # For password hashing
