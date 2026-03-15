@@ -599,9 +599,9 @@ This project is licensed under the MIT License.
 
 ## 🙏 Acknowledgments
 
-- [FastMCP](https://github.com/anthropics/fastmcp) - Framework for quickly building MCP Servers
-- [MCP Protocol](https://modelcontextprotocol.io/) - Model Context Protocol specification
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern high-performance Python web framework
+- [FastMCP](https://github.com/PrefectHQ/fastmcp) - Framework for quickly building MCP Servers
+- [MCP Protocol](https://modelcontextprotocol.io) - Model Context Protocol specification
+- [FastAPI](https://github.com/fastapi/fastapi) - Modern high-performance Python web framework
 
 ---
 

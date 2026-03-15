@@ -596,9 +596,9 @@ MCPHub/
 
 ## 🙏 致谢
 
-- [FastMCP](https://github.com/anthropics/fastmcp) - 快速构建 MCP Server 的框架
-- [MCP Protocol](https://modelcontextprotocol.io/) - Model Context Protocol 规范
-- [FastAPI](https://fastapi.tiangolo.com/) - 现代高性能 Python Web 框架
+- [FastMCP](https://github.com/PrefectHQ/fastmcp) - 快速构建 MCP Server 的框架
+- [MCP Protocol](https://modelcontextprotocol.io) - Model Context Protocol 规范
+- [FastAPI](https://github.com/fastapi/fastapi) - 现代高性能 Python Web 框架
 
 ---
 
