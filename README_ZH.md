@@ -1,3 +1,5 @@
+[English](README.md) | [中文](README_ZH.md)
+
 # MCPHub
 
 <h3 align="center">🚀 一个 MCP 工具服务平台 - 让 AI Agent 只需一个连接，拥有无限能力</h3>
