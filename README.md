@@ -88,7 +88,7 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    After: Unified Entry Point                       
 │  Claude/Cursor only needs to configure one address                  
-│  { "mcpServers": { "mcp-hub": { "url": "http://host:9000/mcp" } } } 
+│  { "mcpServers": { "mcp-hub": { "url": "http://host:6081/mcp" } } } 
 │                                                                     
 │  MCP Hub automatically aggregates all tools, providing:             
 │  ✅ Centralized tool management                                     
@@ -292,7 +292,7 @@ Connect existing MCP Servers to the platform:
 
 **Via API:**
 ```bash
-curl -X POST http://localhost:8000/api/proxy/servers \
+curl -X POST http://localhost:6080/api/proxy/servers \
   -H "Content-Type: application/json" \
   -d '{
     "name": "filesystem-server",
@@ -307,15 +307,15 @@ Generate MCP plugins through conversation:
 
 ```bash
 # Start conversation
-curl -X POST http://localhost:8000/api/codegen/chat \
+curl -X POST http://localhost:6080/api/codegen/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "Help me create a stock query tool that supports real-time prices and historical trends"}'
 
 # Preview generated code
-curl http://localhost:8000/api/codegen/preview/{task_id}
+curl http://localhost:6080/api/codegen/preview/{task_id}
 
 # Install directly to platform
-curl -X POST http://localhost:8000/api/codegen/install/{task_id}
+curl -X POST http://localhost:6080/api/codegen/install/{task_id}
 ```
 
 ### Usage Statistics
@@ -324,13 +324,13 @@ View tool call information:
 
 ```bash
 # Overall overview
-curl http://localhost:8000/api/stats/overview
+curl http://localhost:6080/api/stats/overview
 
 # Statistics by tool
-curl http://localhost:8000/api/stats/tools
+curl http://localhost:6080/api/stats/tools
 
 # Recent call records
-curl http://localhost:8000/api/stats/recent?limit=100
+curl http://localhost:6080/api/stats/recent?limit=100
 ```
 
 Response example:
@@ -451,7 +451,7 @@ def my_tool(param: str) -> dict:
 zip -r my_module.zip my_module/
 
 # Install
-curl -X POST http://localhost:8000/api/modules/install \
+curl -X POST http://localhost:6080/api/modules/install \
   -F "file=@my_module.zip"
 ```
 
@@ -464,7 +464,7 @@ curl -X POST http://localhost:8000/api/modules/install \
 │                    MCP Client (Claude / Cursor)                 │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │ MCP Protocol (HTTP Streamable)
-                                ▼ :9000
+                                ▼ :6081
 ┌─────────────────────────────────────────────────────────────────┐
 │                    MCP Service (FastMCP)                        
 │  ┌───────────────────────────────────────────────────────────┐ 
@@ -481,7 +481,7 @@ curl -X POST http://localhost:8000/api/modules/install \
 └─────────────────────────────────────────────────────────────────┘
                                 │
 ┌─────────────────────────────────────────────────────────────────┐
-│                    REST API (FastAPI) :8000                     │
+│                    REST API (FastAPI) :6080                     │
 │  /api/modules  /api/stats  /api/proxy  /api/codegen  /api/auth  │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
@@ -543,12 +543,12 @@ Main configuration file: `config/config.json`
   },
   "server": {
     "host": "0.0.0.0",
-    "port": 8000
+    "port": 6080
   },
   "mcp": {
     "service_name": "mcphub",
     "host": "0.0.0.0",
-    "port": 9000,
+    "port": 6081,
     "path": "/mcp",
     "tool_name_prefix": "",
     "module_enable": [

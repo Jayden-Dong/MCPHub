@@ -87,7 +87,7 @@
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    之后：统一入口                                
 │  Claude/Cursor 只需配置一个地址                                 
-│  { "mcpServers": { "mcp-hub": { "url": "http://host:9000/mcp" } } } 
+│  { "mcpServers": { "mcp-hub": { "url": "http://host:6081/mcp" } } } 
 │                                                                 
 │  MCP Hub 自动聚合所有工具，实现：                                
 │  ✅ 集中式工具管理                                               
@@ -291,7 +291,7 @@ python main.py
 
 **通过 API：**
 ```bash
-curl -X POST http://localhost:8000/api/proxy/servers \
+curl -X POST http://localhost:6080/api/proxy/servers \
   -H "Content-Type: application/json" \
   -d '{
     "name": "filesystem-server",
@@ -306,15 +306,15 @@ curl -X POST http://localhost:8000/api/proxy/servers \
 
 ```bash
 # 开始对话
-curl -X POST http://localhost:8000/api/codegen/chat \
+curl -X POST http://localhost:6080/api/codegen/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "帮我创建一个股票查询工具，支持查询实时价格和历史走势"}'
 
 # 预览生成的代码
-curl http://localhost:8000/api/codegen/preview/{task_id}
+curl http://localhost:6080/api/codegen/preview/{task_id}
 
 # 直接安装到平台
-curl -X POST http://localhost:8000/api/codegen/install/{task_id}
+curl -X POST http://localhost:6080/api/codegen/install/{task_id}
 ```
 
 ### 使用统计
@@ -323,13 +323,13 @@ curl -X POST http://localhost:8000/api/codegen/install/{task_id}
 
 ```bash
 # 整体概览
-curl http://localhost:8000/api/stats/overview
+curl http://localhost:6080/api/stats/overview
 
 # 按工具统计
-curl http://localhost:8000/api/stats/tools
+curl http://localhost:6080/api/stats/tools
 
 # 最近调用记录
-curl http://localhost:8000/api/stats/recent?limit=100
+curl http://localhost:6080/api/stats/recent?limit=100
 ```
 
 响应示例：
@@ -450,7 +450,7 @@ def my_tool(param: str) -> dict:
 zip -r my_module.zip my_module/
 
 # 安装
-curl -X POST http://localhost:8000/api/modules/install \
+curl -X POST http://localhost:6080/api/modules/install \
   -F "file=@my_module.zip"
 ```
 
@@ -463,7 +463,7 @@ curl -X POST http://localhost:8000/api/modules/install \
 │                    MCP 客户端 (Claude / Cursor)                  
 └───────────────────────────────┬─────────────────────────────────┘
                                 │ MCP Protocol (HTTP Streamable)
-                                ▼ :9000
+                                ▼ :6081
 ┌─────────────────────────────────────────────────────────────────┐
 │                    MCP Service (FastMCP)                        
 │  ┌───────────────────────────────────────────────────────────┐  
@@ -479,7 +479,7 @@ curl -X POST http://localhost:8000/api/modules/install \
 └─────────────────────────────────────────────────────────────────┘
                                 │
 ┌─────────────────────────────────────────────────────────────────┐
-│                    REST API (FastAPI) :8000                     
+│                    REST API (FastAPI) :6080                     
 │  /api/modules  /api/stats  /api/proxy  /api/codegen  /api/auth 
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
@@ -540,12 +540,12 @@ MCPHub/
   },
   "server": {
     "host": "0.0.0.0",
-    "port": 8000
+    "port": 6080
   },
   "mcp": {
     "service_name": "mcphub",
     "host": "0.0.0.0",
-    "port": 9000,
+    "port": 6081,
     "path": "/mcp",
     "tool_name_prefix": "",
     "module_enable": [
