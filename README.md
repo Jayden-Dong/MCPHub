@@ -204,7 +204,7 @@ Beyond built-in tools, the platform supports installing extension plugins. Here 
 
 ```bash
 # Clone the project
-git clone https://github.com/your-username/MCPHub.git
+git clone https://github.com/Jayden-Dong/MCPHub.git
 cd MCPHub
 
 # Create virtual environment

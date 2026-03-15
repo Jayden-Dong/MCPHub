@@ -203,7 +203,7 @@ Agent: [调用 autogui_start_task] → AI 规划任务步骤 → 执行鼠标键
 
 ```bash
 # 克隆项目
-git clone https://github.com/your-username/MCPHub.git
+git clone https://github.com/Jayden-Dong/MCPHub.git
 cd MCPHub
 
 # 创建虚拟环境
