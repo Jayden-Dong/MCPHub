@@ -184,10 +184,7 @@ Agent: [调用 autogui_start_task] → AI 规划任务步骤 → 执行鼠标键
 |------|------|------|------|
 | **📁 文件操作** | `t_file` | `read_file_utf8`, `write_file_utf8`, `unzip` | 本地文件读写、解压缩 |
 | **🌐 FTP 传输** | `t_ftp` | `ftp_upload_file`, `ftp_download_file`, `ftp_create_directory` | FTP 文件传输和管理 |
-| **🧬 PDB 数据库** | `t_pdb` | `download_structure`, `convert_cif_to_pdb` | 蛋白质结构数据库查询和格式转换 |
 | **🔬 Foldseek** | `t_foldseek` | `foldseek_sort_by_evalue`, `foldseek_sort_by_fident` | 蛋白质结构相似性搜索结果处理 |
-| **📊 AlphaBio** | `t_alphabio` | `get_project_info`, `get_enzyme_activity` | AlphaBio 数据库集成 |
-| **🧪 DNA 预测** | `t_dna_predict` | `predict_collection_threshold` | DNA 碱基序列收集阈值预测 |
 | **🗃️ 项目数据库** | `t_project_db` | `query_project_db`, `get_project_db_schema` | PostgreSQL 项目管理数据库查询 |
 
 > 这些扩展工具位于 `tools_external/` 目录，可通过 Web 界面或 API 按需加载。你也可以开发自己的扩展工具并安装到平台。

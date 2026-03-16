@@ -185,10 +185,7 @@ Beyond built-in tools, the platform supports installing extension plugins. Here 
 |----------|--------|-------|-------------|
 | **📁 File Operations** | `t_file` | `read_file_utf8`, `write_file_utf8`, `unzip` | Local file read/write, unzip |
 | **🌐 FTP Transfer** | `t_ftp` | `ftp_upload_file`, `ftp_download_file`, `ftp_create_directory` | FTP file transfer and management |
-| **🧬 PDB Database** | `t_pdb` | `download_structure`, `convert_cif_to_pdb` | Protein structure database query and format conversion |
 | **🔬 Foldseek** | `t_foldseek` | `foldseek_sort_by_evalue`, `foldseek_sort_by_fident` | Protein structure similarity search result processing |
-| **📊 AlphaBio** | `t_alphabio` | `get_project_info`, `get_enzyme_activity` | AlphaBio database integration |
-| **🧪 DNA Prediction** | `t_dna_predict` | `predict_collection_threshold` | DNA base sequence collection threshold prediction |
 | **🗃️ Project Database** | `t_project_db` | `query_project_db`, `get_project_db_schema` | PostgreSQL project management database query |
 
 > These extension tools are located in the `tools_external/` directory and can be loaded on demand through the Web interface or API. You can also develop your own extension tools and install them on the platform.
