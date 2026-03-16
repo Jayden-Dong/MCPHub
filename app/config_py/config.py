@@ -56,6 +56,7 @@ class Settings:
 
         # Auth Settings
         auth_config = self.config_data.get("auth", {})
+        self.AUTH_ENABLED = auth_config.get("enabled", True)  # 是否启用鉴权
         self.AUTH_SECRET_KEY = auth_config.get("secret_key", "default-secret-key-please-change")
         self.AUTH_TOKEN_EXPIRE_HOURS = int(auth_config.get("token_expire_hours", 24))
         self.AUTH_ALGORITHM = auth_config.get("algorithm", "HS256")

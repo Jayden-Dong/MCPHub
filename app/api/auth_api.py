@@ -20,6 +20,12 @@ router = APIRouter(prefix="/api/auth", tags=["认证管理"])
 DB_PATH = Path(settings.DB_PATH)
 
 
+@router.get("/config")
+async def get_auth_config():
+    """获取鉴权配置（公开接口，无需登录）"""
+    return {"enabled": settings.AUTH_ENABLED}
+
+
 def _get_conn() -> sqlite3.Connection:
     """获取数据库连接"""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)

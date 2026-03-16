@@ -62,8 +62,8 @@
         <!-- 分隔线 -->
         <div class="header-divider"></div>
 
-        <!-- 用户菜单 -->
-        <el-dropdown trigger="click" @command="handleUserCommand">
+        <!-- 用户菜单（仅鉴权启用时显示） -->
+        <el-dropdown v-if="authEnabled" trigger="click" @command="handleUserCommand">
           <div class="user-info">
             <el-icon :size="16"><User /></el-icon>
             <span class="username">{{ currentUser?.username || 'User' }}</span>
@@ -127,6 +127,19 @@ const langLabel = computed(() => locale.value === 'en' ? 'EN' : '中')
 const route = useRoute()
 const router = useRouter()
 const isLoginPage = computed(() => route.path === '/login')
+const authEnabled = ref(true)  // 是否启用鉴权
+
+// 获取鉴权配置
+async function loadAuthConfig() {
+  try {
+    const res = await fetch('/api/auth/config')
+    const data = await res.json()
+    authEnabled.value = data.enabled
+  } catch {
+    authEnabled.value = true
+  }
+}
+
 const activeMenu = computed(() => {
   if (route.path.startsWith('/codegen')) return '/codegen'
   if (route.path.startsWith('/proxy')) return '/proxy'
@@ -239,6 +252,7 @@ async function handleChangePassword() {
 onMounted(() => {
   applyTheme(isDark.value)
   loadUser()
+  loadAuthConfig()
   checkConnection()
   heartbeatTimer = setInterval(checkConnection, 5000)
 })

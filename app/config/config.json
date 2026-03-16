@@ -90,6 +90,7 @@
     "db_path": "./config/mcp_hub.db"
   },
   "auth": {
+    "enabled": false,
     "secret_key": "mcp-hub-jwt-secret-key-2024-please-change-in-production",
     "token_expire_hours": 24,
     "algorithm": "HS256"
