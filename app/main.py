@@ -35,12 +35,13 @@ fastapi_app.add_middleware(
 
 def import_webapi_router():
     # 导入 api 目录下的固定路由
-    from api import module_api, codegen_api, stats_api, proxy_api, auth_api
+    from api import module_api, codegen_api, stats_api, proxy_api, auth_api, group_api
     fastapi_app.include_router(auth_api.router)  # 认证路由不需要保护
     fastapi_app.include_router(module_api.router)
     fastapi_app.include_router(codegen_api.router)
     fastapi_app.include_router(stats_api.router)
     fastapi_app.include_router(proxy_api.router)
+    fastapi_app.include_router(group_api.router)
 
     # 动态扫描 tools 和 tools_external 目录下 t_* 子目录中的 *_controller.py
     base_dir = Path(__file__).parent

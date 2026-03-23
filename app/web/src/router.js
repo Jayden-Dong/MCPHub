@@ -91,6 +91,12 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
+  // 不需要鉴权时直接放行
+  if (!authEnabled) {
+    next()
+    return
+  }
+
   // 需要登录的页面
   const token = localStorage.getItem('token')
   if (!token) {

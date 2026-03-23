@@ -103,6 +103,14 @@ async def delete_server(server_id: int):
     return ApiResponse.error(description=result["message"])
 
 
+@router.get("/servers/{server_id}/groups")
+async def get_proxy_groups(server_id: int):
+    """查看代理服务器所属的所有分组"""
+    from mcp_service import group_manager
+    data = group_manager.get_proxy_groups(server_id)
+    return ApiResponse.success(data=data, description="获取成功")
+
+
 # ======================== Sync & Enable/Disable ========================
 
 @router.post("/servers/{server_id}/sync")

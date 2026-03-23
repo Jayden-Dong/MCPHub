@@ -1,12 +1,13 @@
 """LLM client for communicating with DashScope API (OpenAI-compatible)."""
 import base64
+import copy
 import io
 from typing import Optional
 
 from openai import OpenAI
 from PIL import Image
 
-from ..config import setup_logging, DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL, MODEL_NAME, LLM_TEMPERATURE, LLM_MAX_TOKENS
+from ..config import setup_logging, DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL, MODEL_NAME, LLM_TEMPERATURE, LLM_MAX_TOKENS, MAX_IMAGE_HISTORY
 from ..schemas import LLMResponse, parse_llm_response
 from .prompt import build_system_message
 
@@ -133,10 +134,11 @@ class LLMClient:
 
     def _call_api(self) -> str:
         """Make the API call and return the raw response text."""
-        all_messages = [self._system_message] + self._messages
+        messages_to_send = self._trim_images_from_messages(self._messages)
+        all_messages = [self._system_message] + messages_to_send
         logger.info(
-            "Calling API with %d messages (model=%s)",
-            len(all_messages), MODEL_NAME,
+            "Calling API with %d messages (model=%s, image_limit=%d)",
+            len(all_messages), MODEL_NAME, MAX_IMAGE_HISTORY,
         )
 
         response = self._client.chat.completions.create(
@@ -149,6 +151,60 @@ class LLMClient:
         raw_text = response.choices[0].message.content or ""
         logger.debug("API response length: %d chars", len(raw_text))
         return raw_text
+
+    def _trim_images_from_messages(self, messages: list[dict]) -> list[dict]:
+        """Trim images from message history based on MAX_IMAGE_HISTORY config.
+
+        Keeps all text content, only removes old images to reduce token usage.
+        -1 means keep all images, 0 means no images, N means keep last N images.
+
+        Args:
+            messages: Original message list
+
+        Returns:
+            New message list with images trimmed (deep copy)
+        """
+        if MAX_IMAGE_HISTORY < 0:
+            # Keep all images
+            return messages
+
+        # Deep copy to avoid modifying original messages
+        trimmed = copy.deepcopy(messages)
+
+        # Count images from the end (most recent first)
+        images_kept = 0
+        removed_count = 0
+
+        for msg in reversed(trimmed):
+            if msg["role"] != "user":
+                continue
+            if not isinstance(msg.get("content"), list):
+                continue
+
+            # Process each content part in this message
+            new_content = []
+            for part in msg["content"]:
+                if isinstance(part, dict) and part.get("type") == "image_url":
+                    # This is an image
+                    if MAX_IMAGE_HISTORY == 0:
+                        # Remove all images
+                        removed_count += 1
+                        continue
+                    if images_kept < MAX_IMAGE_HISTORY:
+                        images_kept += 1
+                        new_content.append(part)
+                    else:
+                        # Remove this old image
+                        removed_count += 1
+                else:
+                    new_content.append(part)
+
+            msg["content"] = new_content
+
+        if removed_count > 0:
+            logger.info("Trimmed %d images from history (keeping %d)", removed_count, images_kept)
+
+        return trimmed
 
     @staticmethod
     def _encode_image(image: Image.Image, quality: int = 85) -> str:
