@@ -141,7 +141,27 @@ AI: 已生成 t_weather 模块，包含 get_current_weather 和 get_forecast 两
 - **一键导出**：将自定义插件打包为 ZIP，分享给其他用户
 - **模块化隔离**：内置工具 (`tools/`) 与外部插件 (`tools_external/`) 分离管理
 
-### 6️⃣ 全方位使用统计
+### 6️⃣ 分组权限管理
+
+将模块和代理服务器组织成**分组**，精细控制不同 AI 客户端可访问的工具集：
+
+- **分组隔离**：每个分组拥有独立的模块和代理服务器集合
+- **按客户端授权**：客户端通过 HTTP 请求头 `x-group-id` 指定所属分组，只能看到和调用该分组内的工具
+- **默认分组**：新增的模块和代理服务器自动加入默认分组，保证向后兼容
+- **灵活归属**：一个模块或代理服务器可以同时归属多个分组
+
+```
+┌──────────────┐         ┌──────────────┐
+│  分组 A      │         │  分组 B      │
+│  (开发工具)  │         │  (运维工具)  │
+│  • t_python  │         │  • t_cli     │
+│  • t_notebook│         │  • t_ftp     │
+└──────────────┘         └──────────────┘
+   ↑ x-group-id: A          ↑ x-group-id: B
+ Claude 开发 Agent        Claude 运维 Agent
+```
+
+### 7️⃣ 全方位使用统计
 
 直观查看每个工具的使用情况：
 
@@ -178,16 +198,13 @@ Agent: [调用 autogui_start_task] → AI 规划任务步骤 → 执行鼠标键
 
 ## 📦 扩展工具
 
-除了内置工具，平台还支持安装扩展插件。以下是一些可用的扩展工具示例：
+除了内置工具，平台还支持安装扩展插件。`tools_external/` 目录中当前包含以下扩展工具：
 
 | 类别 | 模块 | 工具 | 说明 |
 |------|------|------|------|
-| **📁 文件操作** | `t_file` | `read_file_utf8`, `write_file_utf8`, `unzip` | 本地文件读写、解压缩 |
 | **🌐 FTP 传输** | `t_ftp` | `ftp_upload_file`, `ftp_download_file`, `ftp_create_directory` | FTP 文件传输和管理 |
-| **🔬 Foldseek** | `t_foldseek` | `foldseek_sort_by_evalue`, `foldseek_sort_by_fident` | 蛋白质结构相似性搜索结果处理 |
-| **🗃️ 项目数据库** | `t_project_db` | `query_project_db`, `get_project_db_schema` | PostgreSQL 项目管理数据库查询 |
 
-> 这些扩展工具位于 `tools_external/` 目录，可通过 Web 界面或 API 按需加载。你也可以开发自己的扩展工具并安装到平台。
+> 扩展工具位于 `tools_external/` 目录，可通过 Web 界面或 API 按需加载。你也可以开发自己的扩展工具并安装到平台。
 
 ---
 
@@ -314,6 +331,45 @@ curl http://localhost:6080/api/codegen/preview/{task_id}
 curl -X POST http://localhost:6080/api/codegen/install/{task_id}
 ```
 
+### 分组管理
+
+分组功能允许你将模块和代理服务器组织在一起，并控制每个 AI 客户端可以访问哪些工具。
+
+**通过 Web 界面：**
+1. 进入「分组管理」页面
+2. 点击「新建分组」并填写名称
+3. 将模块或代理服务器添加到分组中
+4. 复制分组 ID，通过 `x-group-id` 请求头传递给客户端
+
+**通过 API：**
+```bash
+# 创建分组
+curl -X POST http://localhost:6080/api/groups \
+  -H "Content-Type: application/json" \
+  -d '{"name": "dev-tools", "description": "开发用工具集"}'
+
+# 将模块加入分组
+curl -X POST http://localhost:6080/api/groups/{group_id}/modules \
+  -H "Content-Type: application/json" \
+  -d '{"module_name": "t_python"}'
+```
+
+**配置 MCP 客户端以使用指定分组：**
+```json
+{
+  "mcpServers": {
+    "dev-tools": {
+      "url": "http://localhost:6081/mcp",
+      "headers": {
+        "x-group-id": "<your-group-id>"
+      }
+    }
+  }
+}
+```
+
+客户端携带 `x-group-id` 请求头后，只能列出和调用该分组内的工具。未携带分组头的客户端可以访问所有已启用的工具。
+
 ### 使用统计
 
 查看工具调用情况：
@@ -371,6 +427,23 @@ curl http://localhost:6080/api/stats/recent?limit=100
 | POST | `/api/proxy/servers/{id}/sync` | 同步工具列表 |
 | POST | `/api/proxy/servers/{id}/enable` | 启用服务器 |
 | POST | `/api/proxy/servers/{id}/disable` | 禁用服务器 |
+
+### 分组管理 `/api/groups`
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/groups` | 获取所有分组 |
+| POST | `/api/groups` | 创建分组 |
+| GET | `/api/groups/{group_id}` | 获取分组详情 |
+| PUT | `/api/groups/{group_id}` | 更新分组信息 |
+| DELETE | `/api/groups/{group_id}` | 删除分组 |
+| GET | `/api/groups/{group_id}/members` | 获取分组成员（模块 + 代理） |
+| POST | `/api/groups/{group_id}/modules` | 添加模块到分组 |
+| DELETE | `/api/groups/{group_id}/modules/{module_name}` | 从分组移除模块 |
+| POST | `/api/groups/{group_id}/proxies` | 添加代理服务器到分组 |
+| DELETE | `/api/groups/{group_id}/proxies/{server_id}` | 从分组移除代理服务器 |
+| GET | `/api/groups/by-module/{module_name}` | 查询模块所属的分组 |
+| GET | `/api/groups/by-proxy/{server_id}` | 查询代理服务器所属的分组 |
 
 ### 统计查询 `/api/stats`
 

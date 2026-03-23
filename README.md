@@ -142,7 +142,27 @@ AI: Generated t_weather module with get_current_weather and get_forecast tools..
 - **One-click Export**: Package custom plugins as ZIP to share with other users
 - **Modular Isolation**: Separate management of built-in tools (`tools/`) and external plugins (`tools_external/`)
 
-### 6️⃣ Comprehensive Usage Statistics
+### 6️⃣ Group-Based Access Control
+
+Organize modules and proxy servers into **groups** to control which tools different AI clients can access:
+
+- **Group Isolation**: Each group has its own set of modules and proxy servers
+- **Per-Client Access**: Clients specify a group via the `x-group-id` HTTP header — they only see and can call tools in that group
+- **Default Group**: All newly added modules/proxies are automatically added to the default group, ensuring backward compatibility
+- **Flexible Assignment**: A module or proxy server can belong to multiple groups simultaneously
+
+```
+┌──────────────┐         ┌──────────────┐
+│  Group A     │         │  Group B     │
+│  (Dev Tools) │         │  (Ops Tools) │
+│  • t_python  │         │  • t_cli     │
+│  • t_notebook│         │  • t_ftp     │
+└──────────────┘         └──────────────┘
+      ↑ x-group-id: A          ↑ x-group-id: B
+ Claude Dev Agent          Claude Ops Agent
+```
+
+### 7️⃣ Comprehensive Usage Statistics
 
 Intuitively view usage for each tool:
 
@@ -179,16 +199,13 @@ This is a **killer feature** of this platform: AI can operate the computer deskt
 
 ## 📦 Extension Tools
 
-Beyond built-in tools, the platform supports installing extension plugins. Here are some available extension tool examples:
+Beyond built-in tools, the platform supports installing extension plugins. Currently available extension tool in `tools_external/`:
 
 | Category | Module | Tools | Description |
 |----------|--------|-------|-------------|
-| **📁 File Operations** | `t_file` | `read_file_utf8`, `write_file_utf8`, `unzip` | Local file read/write, unzip |
 | **🌐 FTP Transfer** | `t_ftp` | `ftp_upload_file`, `ftp_download_file`, `ftp_create_directory` | FTP file transfer and management |
-| **🔬 Foldseek** | `t_foldseek` | `foldseek_sort_by_evalue`, `foldseek_sort_by_fident` | Protein structure similarity search result processing |
-| **🗃️ Project Database** | `t_project_db` | `query_project_db`, `get_project_db_schema` | PostgreSQL project management database query |
 
-> These extension tools are located in the `tools_external/` directory and can be loaded on demand through the Web interface or API. You can also develop your own extension tools and install them on the platform.
+> Extension tools are located in the `tools_external/` directory and can be loaded on demand through the Web interface or API. You can also develop your own extension tools and install them on the platform.
 
 ---
 
@@ -315,6 +332,45 @@ curl http://localhost:6080/api/codegen/preview/{task_id}
 curl -X POST http://localhost:6080/api/codegen/install/{task_id}
 ```
 
+### Group Management
+
+Groups allow you to organize modules and proxy servers and control which tools each AI client can access.
+
+**Via Web Interface:**
+1. Navigate to the "Group Management" page
+2. Click "Create Group" and give it a name
+3. Add modules or proxy servers to the group
+4. Copy the group ID and pass it to the client via the `x-group-id` header
+
+**Via API:**
+```bash
+# Create a group
+curl -X POST http://localhost:6080/api/groups \
+  -H "Content-Type: application/json" \
+  -d '{"name": "dev-tools", "description": "Tools for development"}'
+
+# Add a module to the group
+curl -X POST http://localhost:6080/api/groups/{group_id}/modules \
+  -H "Content-Type: application/json" \
+  -d '{"module_name": "t_python"}'
+```
+
+**Configuring the MCP Client with a Group:**
+```json
+{
+  "mcpServers": {
+    "dev-tools": {
+      "url": "http://localhost:6081/mcp",
+      "headers": {
+        "x-group-id": "<your-group-id>"
+      }
+    }
+  }
+}
+```
+
+When a client provides an `x-group-id` header, it can only list and call tools that belong to that group. Clients without a group header can access all enabled tools.
+
 ### Usage Statistics
 
 View tool call information:
@@ -372,6 +428,23 @@ Response example:
 | POST | `/api/proxy/servers/{id}/sync` | Sync tool list |
 | POST | `/api/proxy/servers/{id}/enable` | Enable server |
 | POST | `/api/proxy/servers/{id}/disable` | Disable server |
+
+### Group Management `/api/groups`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/groups` | Get all groups |
+| POST | `/api/groups` | Create a group |
+| GET | `/api/groups/{group_id}` | Get group details |
+| PUT | `/api/groups/{group_id}` | Update group info |
+| DELETE | `/api/groups/{group_id}` | Delete group |
+| GET | `/api/groups/{group_id}/members` | Get all members (modules + proxies) |
+| POST | `/api/groups/{group_id}/modules` | Add module to group |
+| DELETE | `/api/groups/{group_id}/modules/{module_name}` | Remove module from group |
+| POST | `/api/groups/{group_id}/proxies` | Add proxy server to group |
+| DELETE | `/api/groups/{group_id}/proxies/{server_id}` | Remove proxy from group |
+| GET | `/api/groups/by-module/{module_name}` | Get groups containing a module |
+| GET | `/api/groups/by-proxy/{server_id}` | Get groups containing a proxy |
 
 ### Statistics Query `/api/stats`
 
