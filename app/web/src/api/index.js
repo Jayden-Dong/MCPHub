@@ -238,48 +238,6 @@ export function updateProxyToolDescription(toolId, description) {
   return api.post(`/proxy/tools/${toolId}/description`, { description })
 }
 
-// ========== 分组管理 API ==========
-
-export function getGroups() {
-  return api.get('/groups')
-}
-
-export function getGroupDetail(groupId) {
-  return api.get(`/groups/${groupId}`)
-}
-
-export function createGroup(name, description = '') {
-  return api.post('/groups', { name, description })
-}
-
-export function updateGroup(groupId, data) {
-  return api.put(`/groups/${groupId}`, data)
-}
-
-export function deleteGroup(groupId) {
-  return api.delete(`/groups/${groupId}`)
-}
-
-export function getGroupMembers(groupId) {
-  return api.get(`/groups/${groupId}/members`)
-}
-
-export function addModuleToGroup(groupId, moduleName) {
-  return api.post(`/groups/${groupId}/modules`, { module_name: moduleName })
-}
-
-export function removeModuleFromGroup(groupId, moduleName) {
-  return api.delete(`/groups/${groupId}/modules/${moduleName}`)
-}
-
-export function addProxyToGroup(groupId, serverId) {
-  return api.post(`/groups/${groupId}/proxies`, { server_id: serverId })
-}
-
-export function removeProxyFromGroup(groupId, serverId) {
-  return api.delete(`/groups/${groupId}/proxies/${serverId}`)
-}
-
 // ========== 统计数据 API ==========
 
 export function getStatsOverview(hours = 24) {

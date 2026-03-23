@@ -195,14 +195,6 @@ async def delete_module(module_name: str):
     return ApiResponse.error(description=result["message"])
 
 
-@router.get("/{module_name:path}/groups")
-async def get_module_groups(module_name: str):
-    """查看模块所属的所有分组"""
-    from mcp_service import group_manager
-    data = group_manager.get_module_groups(module_name)
-    return ApiResponse.success(data=data, description="获取成功")
-
-
 @router.get("/{module_name:path}/export")
 async def export_module(module_name: str):
     """导出模块为zip包"""

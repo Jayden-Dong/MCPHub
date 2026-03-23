@@ -57,7 +57,6 @@ class FinishedAction(BaseModel):
     """Task completion signal."""
     type: Literal["finished"] = "finished"
     message: str = Field(default="任务完成", description="Completion message")
-    user_data: dict = Field(default_factory=dict, description="用户请求的结构化结果数据，以key-value形式保存任务执行中获取到的关键数据")
 
 
 # --- Discriminated Union ---

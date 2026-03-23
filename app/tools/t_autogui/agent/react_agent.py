@@ -38,8 +38,6 @@ class ReactAgent:
         self.is_running: bool = False
         self.is_finished: bool = False
         self.finish_message: str = ""
-        self.error_message: str = ""
-        self.user_data: dict = {}
         self.start_time: Optional[float] = None
 
         # Screenshot storage directory
@@ -56,8 +54,6 @@ class ReactAgent:
         self.is_running = False
         self.is_finished = False
         self.finish_message = ""
-        self.error_message = ""
-        self.user_data = {}
         self.start_time = None
         self.llm.reset()
         logger.info("Agent state reset")
@@ -124,7 +120,6 @@ class ReactAgent:
             self.is_finished = True
             self.is_running = False
             self.finish_message = response.action.message
-            self.user_data = response.action.user_data
             logger.info(f"Task completed: {self.finish_message}")
 
             step_duration = round(time.time() - step_start_time, 2)
@@ -210,7 +205,6 @@ class ReactAgent:
         if not self.is_finished and self.current_step >= self.max_steps:
             logger.warning(f"Task terminated: reached max steps ({self.max_steps})")
             self.is_running = False
-            self.error_message = f"Task terminated: reached max steps ({self.max_steps})"
 
         return self.history
 
@@ -232,8 +226,6 @@ class ReactAgent:
             "is_running": self.is_running,
             "is_finished": self.is_finished,
             "finish_message": self.finish_message,
-            "error_message": self.error_message,
-            "user_data": self.user_data,
             "total_steps": len(self.history),
             "elapsed_seconds": elapsed_seconds,
         }

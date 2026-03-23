@@ -46,53 +46,6 @@
       </div>
     </div>
 
-    <!-- 分组筛选栏 -->
-    <div class="group-filter-bar">
-      <div class="group-tabs">
-        <button
-          :class="['group-tab', !selectedGroupId ? 'active' : '']"
-          @click="selectedGroupId = null"
-          @contextmenu.prevent="openGroupContextMenu($event, defaultGroup)"
-        >{{ t('group_all') }}<span class="group-tab-count">{{ modules.length }}</span></button>
-        <button
-          v-for="g in groups"
-          :key="g.id"
-          :class="['group-tab', selectedGroupId === g.id ? 'active' : '']"
-          @click="selectedGroupId = g.id"
-          @contextmenu.prevent="openGroupContextMenu($event, g)"
-        >
-          {{ g.name }}
-          <span class="group-tab-count">{{ (g.module_count || 0) + (g.proxy_count || 0) }}</span>
-        </button>
-        <button class="group-tab group-tab-add" @click="openCreateGroupDialog" :title="t('btn_create_group')">
-          <el-icon :size="14"><Plus /></el-icon>
-        </button>
-      </div>
-    </div>
-
-    <!-- 分组右键菜单 -->
-    <teleport to="body">
-      <div
-        v-if="groupContextMenu.visible"
-        class="group-context-menu"
-        :style="{ left: groupContextMenu.x + 'px', top: groupContextMenu.y + 'px' }"
-        @click="groupContextMenu.visible = false"
-      >
-        <div class="context-menu-item" @click="copyGroupId(groupContextMenu.group)">
-          <el-icon><CopyDocument /></el-icon> {{ t('menu_copy_group_id') }}
-        </div>
-        <template v-if="groupContextMenu.group">
-          <div class="context-menu-divider"></div>
-          <div class="context-menu-item" @click="openEditGroupDialog(groupContextMenu.group)">
-            <el-icon><Edit /></el-icon> {{ t('dlg_edit_group_title') }}
-          </div>
-          <div class="context-menu-item context-menu-danger" @click="handleDeleteGroup(groupContextMenu.group)">
-            <el-icon><Delete /></el-icon> {{ t('btn_delete') }}
-          </div>
-        </template>
-      </div>
-    </teleport>
-
     <!-- 统计信息 -->
     <div class="stats-row">
       <div class="stat-card">
@@ -202,49 +155,6 @@
           >
             <el-icon><View /></el-icon> {{ t('btn_detail') }}
           </el-button>
-          <el-popover
-            trigger="click"
-            :width="240"
-            placement="bottom-start"
-            popper-class="group-assign-popper"
-            @show="loadModuleGroupState(mod)"
-          >
-            <template #reference>
-              <el-button size="small" :class="hasAnyGroup(mod) ? 'btn-grouped' : ''">
-                <el-icon><Folder /></el-icon> {{ t('btn_group') }}
-              </el-button>
-            </template>
-            <div class="gap-panel">
-              <div class="gap-header">
-                <el-icon :size="13" style="color:#409EFF;flex-shrink:0"><Folder /></el-icon>
-                <span class="gap-header-title">{{ t('btn_group') }}</span>
-                <span class="gap-header-name">{{ mod.display_name || mod.module_name }}</span>
-              </div>
-              <div class="gap-divider"></div>
-              <div class="gap-list" v-if="groups.length > 0">
-                <div
-                  v-for="g in groups"
-                  :key="g.id"
-                  class="gap-item"
-                  :class="{ 'gap-item-checked': modGroupChecked[g.id] }"
-                  @click="handleToggleModGroup(mod, g.id, !modGroupChecked[g.id])"
-                >
-                  <span class="gap-item-dot" :style="{ background: groupColor(g.id) }"></span>
-                  <span class="gap-item-label">{{ g.name }}</span>
-                  <el-icon v-if="modGroupChecked[g.id]" class="gap-item-check" :size="14"><Check /></el-icon>
-                </div>
-              </div>
-              <div v-else class="gap-empty">
-                <el-icon :size="28" style="color:var(--text-subtle)"><FolderOpened /></el-icon>
-                <span>{{ t('group_none_hint') }}</span>
-              </div>
-              <div class="gap-divider"></div>
-              <div class="gap-footer" @click="openCreateGroupDialog">
-                <el-icon :size="13"><Plus /></el-icon>
-                <span>{{ t('btn_create_group') }}</span>
-              </div>
-            </div>
-          </el-popover>
           <el-button
             size="small"
             @click="handleReload(mod)"
@@ -332,56 +242,13 @@
             />
           </template>
         </el-table-column>
-        <el-table-column :label="t('col_actions')" width="320" fixed="right" align="center">
+        <el-table-column :label="t('col_actions')" width="280" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-actions">
               <el-button
                 size="small"
                 @click="handleGoDetail(row)"
               >{{ t('btn_detail') }}</el-button>
-              <el-popover
-                trigger="click"
-                :width="240"
-                placement="bottom-start"
-                popper-class="group-assign-popper"
-                @show="loadModuleGroupState(row)"
-              >
-                <template #reference>
-                  <el-button size="small" :class="hasAnyGroup(row) ? 'btn-grouped' : ''" :title="t('btn_group')">
-                    <el-icon><Folder /></el-icon>
-                  </el-button>
-                </template>
-                <div class="gap-panel">
-                  <div class="gap-header">
-                    <el-icon :size="13" style="color:#409EFF;flex-shrink:0"><Folder /></el-icon>
-                    <span class="gap-header-title">{{ t('btn_group') }}</span>
-                    <span class="gap-header-name">{{ row.display_name || row.module_name }}</span>
-                  </div>
-                  <div class="gap-divider"></div>
-                  <div class="gap-list" v-if="groups.length > 0">
-                    <div
-                      v-for="g in groups"
-                      :key="g.id"
-                      class="gap-item"
-                      :class="{ 'gap-item-checked': modGroupChecked[g.id] }"
-                      @click="handleToggleModGroup(row, g.id, !modGroupChecked[g.id])"
-                    >
-                      <span class="gap-item-dot" :style="{ background: groupColor(g.id) }"></span>
-                      <span class="gap-item-label">{{ g.name }}</span>
-                      <el-icon v-if="modGroupChecked[g.id]" class="gap-item-check" :size="14"><Check /></el-icon>
-                    </div>
-                  </div>
-                  <div v-else class="gap-empty">
-                    <el-icon :size="28" style="color:var(--text-subtle)"><FolderOpened /></el-icon>
-                    <span>{{ t('group_none_hint') }}</span>
-                  </div>
-                  <div class="gap-divider"></div>
-                  <div class="gap-footer" @click="openCreateGroupDialog">
-                    <el-icon :size="13"><Plus /></el-icon>
-                    <span>{{ t('btn_create_group') }}</span>
-                  </div>
-                </div>
-              </el-popover>
               <el-button
                 size="small"
                 @click="handleReload(row)"
@@ -451,77 +318,14 @@
       </el-table>
       <el-empty v-if="scanResults.length === 0" :description="t('no_unloaded')" />
     </el-dialog>
-
-    <!-- 创建/编辑分组对话框 -->
-    <el-dialog
-      v-model="showGroupFormDialog"
-      :show-close="false"
-      width="520px"
-      class="group-form-dialog"
-    >
-      <template #header>
-        <div class="group-dlg-header">
-          <div class="group-dlg-icon" :class="editingGroup ? 'icon-edit' : 'icon-create'">
-            <el-icon :size="22"><CollectionTag v-if="!editingGroup" /><Edit v-else /></el-icon>
-          </div>
-          <div>
-            <div class="group-dlg-title">{{ editingGroup ? t('dlg_edit_group_title') : t('dlg_create_group_title') }}</div>
-            <div class="group-dlg-sub">{{ editingGroup ? t('group_dlg_sub_edit') : t('group_dlg_sub_create') }}</div>
-          </div>
-        </div>
-      </template>
-
-      <div class="group-dlg-body">
-        <div class="group-field">
-          <label class="group-field-label">{{ t('label_group_name') }}<span class="required-mark">*</span></label>
-          <el-input
-            v-model="groupForm.name"
-            :placeholder="t('placeholder_group_name')"
-            size="large"
-            clearable
-            @keyup.enter="handleSaveGroup"
-          />
-        </div>
-        <div class="group-field">
-          <label class="group-field-label">{{ t('label_group_desc') }}</label>
-          <el-input
-            v-model="groupForm.description"
-            type="textarea"
-            :rows="3"
-            :placeholder="t('placeholder_group_desc')"
-            resize="none"
-          />
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="group-dlg-footer">
-          <el-button size="large" @click="showGroupFormDialog = false">{{ t('btn_cancel') }}</el-button>
-          <el-button
-            type="primary"
-            size="large"
-            :disabled="!groupForm.name.trim()"
-            @click="handleSaveGroup"
-          >
-            <el-icon><Check /></el-icon>
-            {{ editingGroup ? t('btn_save_desc') : t('btn_create_group') }}
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import {
-  getModules, scanModules, loadModule, unloadModule, reloadModule, installModule, deleteModule, exportModule,
-  getProxyServers, enableProxyServer, disableProxyServer, syncProxyServer, deleteProxyServer,
-  getGroups, createGroup, updateGroup, deleteGroup as deleteGroupApi, getGroupMembers,
-  addModuleToGroup, removeModuleFromGroup, addProxyToGroup, removeProxyFromGroup
-} from '../api/index.js'
+import { getModules, scanModules, loadModule, unloadModule, reloadModule, installModule, deleteModule, exportModule, getProxyServers, enableProxyServer, disableProxyServer, syncProxyServer, deleteProxyServer } from '../api/index.js'
 import { useI18n } from '../i18n.js'
 
 const { t } = useI18n()
@@ -539,18 +343,6 @@ const uploadRef = ref()
 const viewMode = ref('grid')
 const searchKeyword = ref('')
 
-// ---- 分组相关 ----
-const groups = ref([])
-const defaultGroup = ref(null)
-const selectedGroupId = ref(null)
-const groupMemberModuleNames = ref(new Set())
-const groupMemberProxyIds = ref(new Set())
-const showGroupFormDialog = ref(false)
-const editingGroup = ref(null)
-const groupForm = ref({ name: '', description: '' })
-const modGroupChecked = ref({})  // { groupId: boolean } — 当前 popover 打开的模块的分组状态
-const groupContextMenu = ref({ visible: false, x: 0, y: 0, group: null })
-
 const loadedCount = computed(() => modules.value.filter(m => m.loaded).length)
 const totalTools = computed(() =>
   modules.value.reduce((sum, m) => {
@@ -565,32 +357,18 @@ const enabledTools = computed(() =>
   }, 0)
 )
 
-// 过滤后的模块列表（分组 + 搜索）
+// 过滤后的模块列表
 const filteredModules = computed(() => {
-  let list = modules.value
-
-  // 按分组筛选
-  if (selectedGroupId.value) {
-    list = list.filter(m => {
-      if (m.is_proxy) {
-        return groupMemberProxyIds.value.has(m._proxy_id)
-      }
-      return groupMemberModuleNames.value.has(m.module_name)
-    })
+  if (!searchKeyword.value.trim()) {
+    return modules.value
   }
-
-  // 按关键字搜索
-  if (searchKeyword.value.trim()) {
-    const keyword = searchKeyword.value.toLowerCase().trim()
-    list = list.filter(m => {
-      const name = (m.module_name || '').toLowerCase()
-      const displayName = (m.display_name || '').toLowerCase()
-      const desc = (m.description || '').toLowerCase()
-      return name.includes(keyword) || displayName.includes(keyword) || desc.includes(keyword)
-    })
-  }
-
-  return list
+  const keyword = searchKeyword.value.toLowerCase().trim()
+  return modules.value.filter(m => {
+    const name = (m.module_name || '').toLowerCase()
+    const displayName = (m.display_name || '').toLowerCase()
+    const desc = (m.description || '').toLowerCase()
+    return name.includes(keyword) || displayName.includes(keyword) || desc.includes(keyword)
+  })
 })
 
 function enabledToolCount(mod) {
@@ -819,171 +597,8 @@ async function handleDelete(mod) {
   }
 }
 
-// ---- 分组逻辑 ----
-async function fetchGroups() {
-  try {
-    const res = await getGroups()
-    if (res.Code === 12) {
-      const allGroups = res.Data || []
-      defaultGroup.value = allGroups.find(g => g.is_default) || null
-      groups.value = allGroups.filter(g => !g.is_default)
-    }
-  } catch {}
-}
-
-async function loadGroupMembers(groupId) {
-  if (!groupId) {
-    groupMemberModuleNames.value = new Set()
-    groupMemberProxyIds.value = new Set()
-    return
-  }
-  try {
-    const res = await getGroupMembers(groupId)
-    if (res.Code === 12 && res.Data) {
-      groupMemberModuleNames.value = new Set((res.Data.modules || []).map(m => m.module_name))
-      groupMemberProxyIds.value = new Set((res.Data.proxies || []).map(p => p.id))
-    }
-  } catch {}
-}
-
-watch(selectedGroupId, (val) => {
-  loadGroupMembers(val)
-})
-
-function openCreateGroupDialog() {
-  editingGroup.value = null
-  groupForm.value = { name: '', description: '' }
-  showGroupFormDialog.value = true
-}
-
-function openEditGroupDialog(group) {
-  editingGroup.value = group
-  groupForm.value = { name: group.name, description: group.description || '' }
-  showGroupFormDialog.value = true
-}
-
-async function handleSaveGroup() {
-  if (!groupForm.value.name.trim()) return
-  try {
-    let res
-    if (editingGroup.value) {
-      res = await updateGroup(editingGroup.value.id, groupForm.value)
-    } else {
-      res = await createGroup(groupForm.value.name, groupForm.value.description)
-    }
-    if (res.Code === 12) {
-      ElMessage.success(editingGroup.value ? t('msg_update_group_success') : t('msg_create_group_success'))
-      showGroupFormDialog.value = false
-      await fetchGroups()
-    } else {
-      ElMessage.error(res.Message?.Description || (editingGroup.value ? t('msg_update_group_fail') : t('msg_create_group_fail')))
-    }
-  } catch {
-    ElMessage.error(editingGroup.value ? t('msg_update_group_fail') : t('msg_create_group_fail'))
-  }
-}
-
-async function handleDeleteGroup(group) {
-  try {
-    await ElMessageBox.confirm(
-      t('msg_delete_group_confirm', { name: group.name }),
-      t('msg_delete_group_title'),
-      { type: 'warning' }
-    )
-    const res = await deleteGroupApi(group.id)
-    if (res.Code === 12) {
-      ElMessage.success(t('msg_delete_group_success'))
-      if (selectedGroupId.value === group.id) selectedGroupId.value = null
-      await fetchGroups()
-    } else {
-      ElMessage.error(res.Message?.Description || t('msg_delete_group_fail'))
-    }
-  } catch {}
-}
-
-// 分组右键菜单
-function openGroupContextMenu(event, group) {
-  groupContextMenu.value = { visible: true, x: event.clientX, y: event.clientY, group }
-  // 点击任意位置关闭
-  const close = () => {
-    groupContextMenu.value.visible = false
-    document.removeEventListener('click', close)
-  }
-  setTimeout(() => document.addEventListener('click', close), 0)
-}
-
-function copyGroupId(group) {
-  const id = group ? String(group.id) : ''
-  navigator.clipboard.writeText(id)
-  ElMessage.success(t('msg_group_id_copied'))
-}
-
-// 卡片上的分组 popover：加载当前模块的分组状态
-async function loadModuleGroupState(mod) {
-  modGroupChecked.value = {}
-  try {
-    const moduleName = mod.is_proxy ? null : mod.module_name
-    const serverId = mod.is_proxy ? mod._proxy_id : null
-    // 获取此模块/代理所属的所有分组
-    const endpoint = mod.is_proxy
-      ? `/proxy/servers/${serverId}/groups`
-      : `/modules/${moduleName}/groups`
-    const res = await (await fetch(`/api${endpoint}`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token') || ''}` }
-    })).json()
-    if (res.Code === 12) {
-      const belongIds = new Set((res.Data || []).map(g => g.id))
-      const checked = {}
-      for (const g of groups.value) {
-        checked[g.id] = belongIds.has(g.id)
-      }
-      modGroupChecked.value = checked
-    }
-  } catch {}
-}
-
-// 根据分组 id 生成固定颜色
-const GROUP_COLORS = ['#409EFF','#67C23A','#E6A23C','#F56C6C','#9B59B6','#1ABC9C','#E67E22','#3498DB']
-function groupColor(groupId) {
-  // 用 id 字符串的 charCode 累加取模，稳定映射颜色
-  let hash = 0
-  for (let i = 0; i < groupId.length; i++) hash = (hash + groupId.charCodeAt(i)) % GROUP_COLORS.length
-  return GROUP_COLORS[hash]
-}
-
-// 判断当前模块是否已属于至少一个分组（popover 打开后根据 modGroupChecked 判断）
-function hasAnyGroup(mod) {
-  return Object.values(modGroupChecked.value).some(v => v)
-}
-
-// 勾选/取消勾选某个分组
-async function handleToggleModGroup(mod, groupId, checked) {
-  try {
-    let res
-    if (mod.is_proxy) {
-      res = checked
-        ? await addProxyToGroup(groupId, mod._proxy_id)
-        : await removeProxyFromGroup(groupId, mod._proxy_id)
-    } else {
-      res = checked
-        ? await addModuleToGroup(groupId, mod.module_name)
-        : await removeModuleFromGroup(groupId, mod.module_name)
-    }
-    if (res.Code === 12) {
-      modGroupChecked.value = { ...modGroupChecked.value, [groupId]: checked }
-      await fetchGroups()
-      if (selectedGroupId.value) await loadGroupMembers(selectedGroupId.value)
-    } else {
-      ElMessage.error(res.Message?.Description || t('msg_op_fail'))
-    }
-  } catch {
-    ElMessage.error(t('msg_op_fail'))
-  }
-}
-
 onMounted(() => {
   fetchModules()
-  fetchGroups()
 })
 </script>
 
@@ -1073,234 +688,6 @@ onMounted(() => {
 .view-btn.active {
   background: #409eff;
   color: #fff;
-}
-
-/* ---- 分组筛选栏 ---- */
-.group-filter-bar {
-  display: flex;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.group-tabs {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.group-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 14px;
-  border-radius: 16px;
-  border: 1px solid var(--border-control);
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-  line-height: 1.4;
-}
-
-.group-tab:hover {
-  border-color: #409EFF;
-  color: #409EFF;
-  background: rgba(64, 158, 255, 0.04);
-}
-
-.group-tab.active {
-  background: #409EFF;
-  color: #fff;
-  border-color: #409EFF;
-}
-
-.group-tab-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.08);
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 0 6px;
-  min-width: 18px;
-  height: 18px;
-}
-
-.group-tab.active .group-tab-count {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.group-tab-add {
-  padding: 5px 10px;
-  border-style: dashed;
-  color: var(--text-muted);
-}
-
-.group-tab-add:hover {
-  border-color: #409EFF;
-  color: #409EFF;
-  border-style: solid;
-}
-
-/* ---- 分组右键菜单 ---- */
-.group-context-menu {
-  position: fixed;
-  z-index: 9999;
-  background: var(--bg-card);
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-  padding: 4px 0;
-  min-width: 140px;
-}
-
-.context-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  font-size: 13px;
-  color: var(--text-regular);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.context-menu-item:hover {
-  background: rgba(64, 158, 255, 0.08);
-  color: #409EFF;
-}
-
-.context-menu-item.context-menu-danger:hover {
-  background: rgba(245, 108, 108, 0.08);
-  color: #F56C6C;
-}
-
-.context-menu-divider {
-  height: 1px;
-  background: var(--border-default);
-  margin: 4px 0;
-}
-
-/* ---- 分组分配 Popover 面板 ---- */
-.gap-panel {
-  padding: 0;
-  user-select: none;
-}
-
-.gap-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 14px 10px;
-  overflow: hidden;
-}
-
-.gap-header-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.gap-header-name {
-  font-size: 12px;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-}
-
-.gap-divider {
-  height: 1px;
-  background: var(--border-divider);
-  margin: 0;
-}
-
-.gap-list {
-  padding: 6px 6px;
-  max-height: 220px;
-  overflow-y: auto;
-}
-
-.gap-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 7px;
-  cursor: pointer;
-  transition: background 0.15s;
-  position: relative;
-}
-
-.gap-item:hover {
-  background: rgba(64, 158, 255, 0.07);
-}
-
-.gap-item-checked {
-  background: rgba(64, 158, 255, 0.1) !important;
-}
-
-.gap-item-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.gap-item-label {
-  font-size: 13px;
-  color: var(--text-regular);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.gap-item-checked .gap-item-label {
-  color: #409EFF;
-  font-weight: 500;
-}
-
-.gap-item-check {
-  color: #409EFF;
-  flex-shrink: 0;
-}
-
-.gap-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 18px 14px;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.gap-footer {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 14px;
-  font-size: 13px;
-  color: #409EFF;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.gap-footer:hover {
-  background: rgba(64, 158, 255, 0.07);
-}
-
-/* 已分组的按钮高亮 */
-.btn-grouped {
-  border-color: #409EFF !important;
-  color: #409EFF !important;
 }
 
 /* ---- 统计卡片 ---- */
@@ -1537,88 +924,5 @@ onMounted(() => {
 
 .table-actions .el-button {
   margin: 0;
-}
-
-/* ---- 分组表单对话框 ---- */
-.group-dlg-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 4px 0;
-}
-
-.group-dlg-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.group-dlg-icon.icon-create {
-  background: rgba(64, 158, 255, 0.12);
-  color: #409EFF;
-}
-
-.group-dlg-icon.icon-edit {
-  background: rgba(103, 194, 58, 0.12);
-  color: #67C23A;
-}
-
-.group-dlg-title {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.3;
-}
-
-.group-dlg-sub {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-top: 3px;
-}
-
-.group-dlg-body {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding: 8px 0 4px;
-}
-
-.group-field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.group-field-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-regular);
-}
-
-.required-mark {
-  color: #F56C6C;
-  margin-left: 3px;
-}
-
-.group-dlg-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding-top: 4px;
-}
-</style>
-
-<style>
-/* 分组 Popover 圆角美化（全局，因为 popper 渲染在 body 下） */
-.group-assign-popper.el-popover {
-  border-radius: 12px !important;
-  overflow: hidden !important;
-  padding: 0 !important;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.13) !important;
-  border: 1px solid var(--border-control, #e4e7ed) !important;
 }
 </style>

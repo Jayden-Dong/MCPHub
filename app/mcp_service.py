@@ -7,18 +7,14 @@ from my_mcp_middleware import ToolEnabledCheckerMiddleware, ToolDescriptionCheck
 from config_py.config import settings
 from managers.module_manager import ModuleManager
 from managers.proxy_manager import ProxyManager
-from managers.group_manager import GroupManager
 
 mcp = FastMCP(name=f"{settings.MCP_SERVICE_NAME}")
 
-# 全局分组管理器实例
-group_manager = GroupManager()
-
 # 全局模块管理器实例
-module_manager = ModuleManager(mcp, group_manager)
+module_manager = ModuleManager(mcp)
 
 # 全局代理管理器实例
-proxy_manager = ProxyManager(mcp, module_manager, group_manager)
+proxy_manager = ProxyManager(mcp, module_manager)
 
 
 # ----------- MCP 服务主线程启动（仅全局一个）--------------

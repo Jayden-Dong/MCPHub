@@ -1,11 +1,12 @@
 """
 MCP模块管理器
 负责模块的生命周期管理：扫描、加载、卸载、启用/禁用工具
-使用 SQLModel ORM 持久化模块和工具的启停状态，重启后自动恢复
+使用SQLite持久化模块和工具的启停状态，重启后自动恢复
 """
 import importlib
 import json
 import os
+import sqlite3
 import sys
 import shutil
 import subprocess
@@ -14,12 +15,8 @@ from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 
-from sqlmodel import Session, select
-
 from config_py.logger import app_logger
 from config_py.config import settings
-from db.database import engine, init_db
-from db.models.module import Module, Tool
 
 
 @dataclass
@@ -52,10 +49,11 @@ class ModuleManager:
     BUILTIN_TOOLS_DIR = Path("./tools")
     # 外部模块目录
     EXTERNAL_TOOLS_DIR = Path("./tools_external")
+    # SQLite数据库路径
+    DB_PATH = Path(settings.DB_PATH)
 
-    def __init__(self, mcp_instance, group_manager=None):
+    def __init__(self, mcp_instance):
         self.mcp = mcp_instance
-        self._group_manager = group_manager
         self._modules: dict[str, ModuleInfo] = {}  # module_name -> ModuleInfo
         self._tool_to_module: dict[str, str] = {}  # tool_name -> module_name
 
@@ -71,223 +69,236 @@ class ModuleManager:
         self._init_db()
 
     # ================================================================
-    #  ORM 持久化层
+    #  SQLite 持久化层
     # ================================================================
 
-    def _get_session(self) -> Session:
-        """获取数据库会话"""
-        return Session(engine)
+    def _get_conn(self) -> sqlite3.Connection:
+        """获取数据库连接"""
+        self.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(self.DB_PATH))
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        return conn
 
     def _init_db(self):
         """初始化数据库表结构"""
-        init_db()
+        conn = self._get_conn()
+        try:
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS modules (
+                    module_name   TEXT PRIMARY KEY,
+                    display_name  TEXT DEFAULT '',
+                    version       TEXT DEFAULT '1.0.0',
+                    description   TEXT DEFAULT '',
+                    author        TEXT DEFAULT '',
+                    loaded        INTEGER DEFAULT 1,
+                    is_external   INTEGER DEFAULT 0,
+                    install_time  TEXT DEFAULT '',
+                    config        TEXT DEFAULT '{}'
+                );
+
+                CREATE TABLE IF NOT EXISTS tools (
+                    tool_name    TEXT PRIMARY KEY,
+                    module_name  TEXT NOT NULL,
+                    enabled      INTEGER DEFAULT 1,
+                    FOREIGN KEY (module_name) REFERENCES modules(module_name)
+                        ON DELETE CASCADE
+                );
+            """)
+            conn.commit()
+
+            # 检查并添加 install_time 字段（兼容已有数据库）
+            cursor = conn.execute("PRAGMA table_info(modules)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'install_time' not in columns:
+                conn.execute("ALTER TABLE modules ADD COLUMN install_time TEXT DEFAULT ''")
+                conn.commit()
+        finally:
+            conn.close()
 
     def _db_save_module(self, module_info: ModuleInfo):
         """保存/更新模块状态到数据库"""
-        with self._get_session() as session:
-            # 查找现有模块
-            existing = session.exec(
-                select(Module).where(Module.module_name == module_info.module_name)
-            ).first()
-
-            if existing:
-                # 更新现有模块
-                existing.display_name = module_info.display_name
-                existing.version = module_info.version
-                existing.description = module_info.description
-                existing.author = module_info.author
-                existing.loaded = 1 if module_info.loaded else 0
-                existing.is_external = 1 if module_info.is_external else 0
-                existing.install_time = module_info.install_time
-                existing.config = json.dumps(module_info.config, ensure_ascii=False)
-                session.add(existing)
-            else:
-                # 创建新模块
-                module = Module(
-                    module_name=module_info.module_name,
-                    display_name=module_info.display_name,
-                    version=module_info.version,
-                    description=module_info.description,
-                    author=module_info.author,
-                    loaded=1 if module_info.loaded else 0,
-                    is_external=1 if module_info.is_external else 0,
-                    install_time=module_info.install_time,
-                    config=json.dumps(module_info.config, ensure_ascii=False)
-                )
-                session.add(module)
-            session.commit()
+        conn = self._get_conn()
+        try:
+            conn.execute("""
+                INSERT OR REPLACE INTO modules
+                    (module_name, display_name, version, description, author,
+                     loaded, is_external, install_time, config)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                module_info.module_name,
+                module_info.display_name,
+                module_info.version,
+                module_info.description,
+                module_info.author,
+                1 if module_info.loaded else 0,
+                1 if module_info.is_external else 0,
+                module_info.install_time,
+                json.dumps(module_info.config, ensure_ascii=False),
+            ))
+            conn.commit()
+        finally:
+            conn.close()
 
     def _db_save_tool(self, tool_name: str, module_name: str, enabled: bool):
         """保存工具到数据库（仅新增，不覆盖已有记录的enabled状态）"""
-        with self._get_session() as session:
-            # 检查工具是否已存在
-            existing = session.exec(
-                select(Tool).where(Tool.tool_name == tool_name)
-            ).first()
-
-            if not existing:
-                # 仅新增，不覆盖
-                tool = Tool(
-                    tool_name=tool_name,
-                    module_name=module_name,
-                    enabled=1 if enabled else 0
-                )
-                session.add(tool)
-                session.commit()
+        conn = self._get_conn()
+        try:
+            # 使用 INSERT OR IGNORE：如果工具已存在则保留旧记录（保留用户设置的enabled状态）
+            conn.execute("""
+                INSERT OR IGNORE INTO tools
+                    (tool_name, module_name, enabled)
+                VALUES (?, ?, ?)
+            """, (tool_name, module_name, 1 if enabled else 0))
+            conn.commit()
+        finally:
+            conn.close()
 
     def _db_update_tool_enabled(self, tool_name: str, enabled: bool):
         """仅更新工具的启用状态"""
-        with self._get_session() as session:
-            tool = session.exec(
-                select(Tool).where(Tool.tool_name == tool_name)
-            ).first()
-            if tool:
-                tool.enabled = 1 if enabled else 0
-                session.add(tool)
-                session.commit()
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                "UPDATE tools SET enabled = ? WHERE tool_name = ?",
+                (1 if enabled else 0, tool_name)
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
     def _db_update_module_loaded(self, module_name: str, loaded: bool):
         """仅更新模块的加载状态"""
-        with self._get_session() as session:
-            module = session.exec(
-                select(Module).where(Module.module_name == module_name)
-            ).first()
-            if module:
-                module.loaded = 1 if loaded else 0
-                session.add(module)
-                session.commit()
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                "UPDATE modules SET loaded = ? WHERE module_name = ?",
+                (1 if loaded else 0, module_name)
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
     def _db_update_module_config(self, module_name: str, config: dict):
         """更新模块的配置"""
-        with self._get_session() as session:
-            module = session.exec(
-                select(Module).where(Module.module_name == module_name)
-            ).first()
-            if module:
-                module.config = json.dumps(config, ensure_ascii=False)
-                session.add(module)
-                session.commit()
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                "UPDATE modules SET config = ? WHERE module_name = ?",
+                (json.dumps(config, ensure_ascii=False), module_name)
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
     def _db_delete_module(self, module_name: str):
         """从数据库中删除模块及其工具"""
-        with self._get_session() as session:
-            # 删除分组关联
-            from db.models.group import ModuleGroupLink
-            links = session.exec(
-                select(ModuleGroupLink).where(ModuleGroupLink.module_name == module_name)
-            ).all()
-            for link in links:
-                session.delete(link)
-
-            # 删除工具
-            tools = session.exec(
-                select(Tool).where(Tool.module_name == module_name)
-            ).all()
-            for tool in tools:
-                session.delete(tool)
-
-            # 删除模块
-            module = session.exec(
-                select(Module).where(Module.module_name == module_name)
-            ).first()
-            if module:
-                session.delete(module)
-
-            session.commit()
+        conn = self._get_conn()
+        try:
+            conn.execute("DELETE FROM tools WHERE module_name = ?", (module_name,))
+            conn.execute("DELETE FROM modules WHERE module_name = ?", (module_name,))
+            conn.commit()
+        finally:
+            conn.close()
 
     def _db_delete_tools_by_module(self, module_name: str):
         """删除某模块下所有工具记录"""
-        with self._get_session() as session:
-            tools = session.exec(
-                select(Tool).where(Tool.module_name == module_name)
-            ).all()
-            for tool in tools:
-                session.delete(tool)
-            session.commit()
+        conn = self._get_conn()
+        try:
+            conn.execute("DELETE FROM tools WHERE module_name = ?", (module_name,))
+            conn.commit()
+        finally:
+            conn.close()
 
     def _db_get_tool_enabled(self, tool_name: str) -> Optional[bool]:
         """从数据库查询工具的启用状态，不存在返回None"""
-        with self._get_session() as session:
-            tool = session.exec(
-                select(Tool).where(Tool.tool_name == tool_name)
-            ).first()
-            if tool:
-                return bool(tool.enabled)
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                "SELECT enabled FROM tools WHERE tool_name = ?",
+                (tool_name,)
+            ).fetchone()
+            if row is not None:
+                return bool(row["enabled"])
             return None
+        finally:
+            conn.close()
 
     def _db_get_all_external_modules(self) -> list[dict]:
         """获取数据库中所有外部模块（重启恢复用）"""
-        with self._get_session() as session:
-            modules = session.exec(
-                select(Module).where(Module.is_external == 1)
-            ).all()
-            return [
-                {
-                    "module_name": m.module_name,
-                    "display_name": m.display_name,
-                    "version": m.version,
-                    "description": m.description,
-                    "author": m.author,
-                    "loaded": m.loaded,
-                    "is_external": m.is_external,
-                    "install_time": m.install_time,
-                    "config": m.config
-                }
-                for m in modules
-            ]
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                "SELECT * FROM modules WHERE is_external = 1"
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
 
     def _db_get_module_loaded(self, module_name: str) -> Optional[bool]:
         """查询模块在DB中记录的loaded状态"""
-        with self._get_session() as session:
-            module = session.exec(
-                select(Module).where(Module.module_name == module_name)
-            ).first()
-            if module:
-                return bool(module.loaded)
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                "SELECT loaded FROM modules WHERE module_name = ?",
+                (module_name,)
+            ).fetchone()
+            if row is not None:
+                return bool(row["loaded"])
             return None
+        finally:
+            conn.close()
 
     def _db_get_module_install_time(self, module_name: str) -> str:
         """查询模块在DB中记录的install_time"""
-        with self._get_session() as session:
-            module = session.exec(
-                select(Module).where(Module.module_name == module_name)
-            ).first()
-            if module:
-                return module.install_time or ""
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                "SELECT install_time FROM modules WHERE module_name = ?",
+                (module_name,)
+            ).fetchone()
+            if row is not None:
+                return row["install_time"] or ""
             return ""
+        finally:
+            conn.close()
 
     def _db_update_install_time(self, module_name: str, install_time: str):
         """更新模块的安装时间"""
-        with self._get_session() as session:
-            module = session.exec(
-                select(Module).where(Module.module_name == module_name)
-            ).first()
-            if module:
-                module.install_time = install_time
-                session.add(module)
-                session.commit()
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                "UPDATE modules SET install_time = ? WHERE module_name = ?",
+                (install_time, module_name)
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
     def _ensure_all_modules_install_time(self):
         """检查所有模块的安装时间，不存在则设置为当前时间"""
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with self._get_session() as session:
-            modules = session.exec(
-                select(Module).where(
-                    (Module.install_time == "") | (Module.install_time == None)
+        conn = self._get_conn()
+        try:
+            # 查询所有没有安装时间的模块
+            rows = conn.execute(
+                "SELECT module_name FROM modules WHERE install_time = '' OR install_time IS NULL"
+            ).fetchall()
+
+            for row in rows:
+                module_name = row["module_name"]
+                conn.execute(
+                    "UPDATE modules SET install_time = ? WHERE module_name = ?",
+                    (current_time, module_name)
                 )
-            ).all()
-
-            for module in modules:
-                module.install_time = current_time
-                session.add(module)
-
                 # 同时更新内存中的模块信息
-                if module.module_name in self._modules:
-                    self._modules[module.module_name].install_time = current_time
-                app_logger.info(f"已为模块 {module.module_name} 补充安装时间: {current_time}")
+                if module_name in self._modules:
+                    self._modules[module_name].install_time = current_time
+                app_logger.info(f"已为模块 {module_name} 补充安装时间: {current_time}")
 
-            if modules:
-                session.commit()
+            if rows:
+                conn.commit()
+        finally:
+            conn.close()
 
     # ================================================================
     #  内部辅助方法
@@ -469,13 +480,6 @@ class ModuleManager:
 
             # 从DB恢复工具启禁状态（覆盖默认值）
             self._apply_saved_tool_states(module_name)
-
-            # 自动加入默认分组
-            if self._group_manager:
-                try:
-                    self._group_manager.add_module_to_default_group(module_name)
-                except Exception as e:
-                    app_logger.warning(f"模块 {module_name} 加入默认分组失败: {e}")
 
             app_logger.info(f"模块加载成功: {module_name}, 工具数: {len(new_tools)}")
             return {
@@ -936,27 +940,31 @@ class ModuleManager:
             return module_dict
 
         # 如果内存中没有，尝试从数据库获取（未加载但已安装的模块）
-        with self._get_session() as session:
-            module = session.exec(
-                select(Module).where(Module.module_name == module_name)
-            ).first()
-            if module:
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                "SELECT * FROM modules WHERE module_name = ?",
+                (module_name,)
+            ).fetchone()
+            if row:
                 # 从数据库构建 ModuleInfo
                 module_info = ModuleInfo(
-                    module_name=module.module_name,
-                    display_name=module.display_name or "",
-                    version=module.version or "1.0.0",
-                    description=module.description or "",
-                    author=module.author or "",
-                    loaded=bool(module.loaded),
-                    is_external=bool(module.is_external),
-                    install_time=module.install_time or "",
-                    config=json.loads(module.config or "{}"),
+                    module_name=row["module_name"],
+                    display_name=row["display_name"] or "",
+                    version=row["version"] or "1.0.0",
+                    description=row["description"] or "",
+                    author=row["author"] or "",
+                    loaded=bool(row["loaded"]),
+                    is_external=bool(row["is_external"]),
+                    install_time=row["install_time"] or "",
+                    config=json.loads(row["config"] or "{}"),
                     tools=[]  # 未加载模块工具列表为空
                 )
                 # 缓存到内存
                 self._modules[module_name] = module_info
                 return asdict(module_info)
+        finally:
+            conn.close()
 
         return None
 
@@ -1091,7 +1099,15 @@ class ModuleManager:
                 self._modules[module_name].install_time = install_time
                 self._db_update_module_loaded(module_name, False)
                 # 更新数据库中的安装时间
-                self._db_update_install_time(module_name, install_time)
+                conn = self._get_conn()
+                try:
+                    conn.execute(
+                        "UPDATE modules SET install_time = ? WHERE module_name = ?",
+                        (install_time, module_name)
+                    )
+                    conn.commit()
+                finally:
+                    conn.close()
                 # 同时从内存中移除工具注册
                 for tool in self._modules[module_name].tools:
                     tool_obj = self.mcp._tool_manager._tools.get(tool['name'])

@@ -7,7 +7,6 @@ from typing import Dict
 
 from config_py.logger import app_logger
 from tools.t_autogui.agent import ReactAgent
-from tools.t_autogui.config import GUI_MODE, REMOTE_GUI_URL
 
 
 class AutoGUITool:
@@ -15,19 +14,7 @@ class AutoGUITool:
 
     def __init__(self):
         self._lock = threading.Lock()
-
-        # 根据配置选择本地或远程 GUI 操作模式
-        gui_tools = None
-        if GUI_MODE == "remote":
-            if not REMOTE_GUI_URL:
-                raise ValueError("gui_mode 为 remote 时必须配置 remote_gui_url")
-            from tools.t_autogui.tools.remote_gui_tools import RemoteGUITools
-            gui_tools = RemoteGUITools(REMOTE_GUI_URL)
-            app_logger.info(f"AutoGUI 使用远程模式: {REMOTE_GUI_URL}")
-        else:
-            app_logger.info("AutoGUI 使用本地模式")
-
-        self._agent = ReactAgent(gui_tools=gui_tools)
+        self._agent = ReactAgent()
         self._thread: threading.Thread = None
         # idle | running | finished | error
         self._status = "idle"

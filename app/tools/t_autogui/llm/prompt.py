@@ -52,8 +52,6 @@ def build_system_prompt() -> str:
 
 7. **finished** - 任务完成
    - message: 完成说明
-   - user_data: 用户请求的结构化结果数据（字典格式），将任务执行过程中获取到的关键数据以 key-value 形式填入。
-     例如：用户要求"统计桌面文件数量，将结果保存到 files_count 字段"，则填写 {{"files_count": 10}}。如果用户没有明确要求返回数据，可以不填。
 
 ## 输出格式
 

@@ -20,12 +20,6 @@ MAX_STEPS: int = int(_config.get("max_steps", 20))
 SCREENSHOT_DELAY: float = float(_config.get("screenshot_delay", 1.0))
 LLM_TEMPERATURE: float = float(_config.get("llm_temperature", 0.1))
 LLM_MAX_TOKENS: int = int(_config.get("llm_max_tokens", 1024))
-# Max images in history: -1 means all images, 0 means no images, N means last N images
-MAX_IMAGE_HISTORY: int = int(_config.get("max_image_history", 3))
-
-# GUI mode: "local" (default) or "remote" (screenshot & actions via HTTP to remote agent)
-GUI_MODE: str = _config.get("gui_mode", "local")
-REMOTE_GUI_URL: str = _config.get("remote_gui_url", "")
 
 # Logging
 LOG_LEVEL: str = settings.LOG_LEVEL
