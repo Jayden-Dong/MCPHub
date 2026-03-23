@@ -2,19 +2,22 @@
 第三方 MCP Server 代理管理器
 支持接入 HTTP Streamable 和 HTTP SSE 类型的第三方 MCP 服务器，
 将远端工具透明代理到本地 FastMCP 实例。
+使用 SQLModel ORM 操作数据库
 """
 import asyncio
 import json
-import sqlite3
 import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Any
 
+from sqlmodel import Session, select
+
 from config_py.logger import app_logger
 from config_py.config import settings
 from fastmcp.server.proxy import FastMCPProxy, ProxyClient
-
+from db.database import engine, init_db
+from db.models.proxy import ProxyServer, ProxyTool
 
 
 class ProxyServerInfo:
@@ -37,11 +40,10 @@ class ProxyServerInfo:
 class ProxyManager:
     """第三方 MCP Server 代理管理器"""
 
-    DB_PATH = Path(settings.DB_PATH)
-
-    def __init__(self, mcp_instance, module_manager):
+    def __init__(self, mcp_instance, module_manager, group_manager=None):
         self.mcp = mcp_instance
         self.module_manager = module_manager
+        self._group_manager = group_manager
 
         # server_id -> ProxyServerInfo
         self._servers: dict[int, ProxyServerInfo] = {}
@@ -56,54 +58,13 @@ class ProxyManager:
     #  数据库层
     # ================================================================
 
-    def _get_conn(self) -> sqlite3.Connection:
-        self.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(self.DB_PATH))
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA foreign_keys=ON")
-        return conn
+    def _get_session(self) -> Session:
+        """获取数据库会话"""
+        return Session(engine)
 
     def _init_db(self):
-        conn = self._get_conn()
-        try:
-            conn.executescript("""
-                CREATE TABLE IF NOT EXISTS proxy_servers (
-                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name          TEXT NOT NULL UNIQUE,
-                    url           TEXT NOT NULL,
-                    transport     TEXT DEFAULT 'streamable-http',
-                    enabled       INTEGER DEFAULT 0,
-                    description   TEXT DEFAULT '',
-                    headers       TEXT DEFAULT '{}',
-                    created_time  TEXT DEFAULT '',
-                    last_sync     TEXT DEFAULT '',
-                    timeout       INTEGER DEFAULT 60
-                );
-
-                CREATE TABLE IF NOT EXISTS proxy_tools (
-                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                    server_id    INTEGER NOT NULL,
-                    raw_name     TEXT NOT NULL,
-                    description  TEXT DEFAULT '',
-                    custom_desc  TEXT DEFAULT '',
-                    input_schema TEXT DEFAULT '{}',
-                    enabled      INTEGER DEFAULT 1,
-                    FOREIGN KEY (server_id) REFERENCES proxy_servers(id) ON DELETE CASCADE,
-                    UNIQUE(server_id, raw_name)
-                );
-            """)
-            conn.commit()
-
-            # 兼容旧数据库：若 timeout 列不存在则补加
-            try:
-                conn.execute("ALTER TABLE proxy_servers ADD COLUMN timeout INTEGER DEFAULT 60")
-                conn.commit()
-            except Exception as e:
-                # 列已存在，忽略
-                app_logger.debug(f"添加 timeout 列失败（可能已存在）: {e}")
-        finally:
-            conn.close()
+        """初始化数据库"""
+        init_db()
 
     # ================================================================
     #  内部辅助
@@ -288,145 +249,192 @@ class ProxyManager:
 
     def load_from_db(self):
         """服务启动时从数据库恢复已启用的代理服务器"""
-        conn = self._get_conn()
-        try:
-            servers = conn.execute(
-                "SELECT * FROM proxy_servers WHERE enabled = 1"
-            ).fetchall()
-            for row in servers:
-                server = ProxyServerInfo(**dict(row))
+        with self._get_session() as session:
+            servers = session.exec(
+                select(ProxyServer).where(ProxyServer.enabled == 1)
+            ).all()
+            for server in servers:
+                server_info = ProxyServerInfo(
+                    id=server.id,
+                    name=server.name,
+                    url=server.url,
+                    transport=server.transport,
+                    enabled=server.enabled,
+                    description=server.description,
+                    headers=server.headers,
+                    created_time=server.created_time,
+                    last_sync=server.last_sync,
+                    timeout=server.timeout
+                )
                 # 调用 enable_server 完成完整的启用流程：
                 # 注册工具、挂载 FastMCPProxy、添加中间件
                 self.enable_server(server.id)
-        finally:
-            conn.close()
 
     # ================================================================
     #  服务器 CRUD
     # ================================================================
 
     def get_all_servers(self) -> list[dict]:
-        conn = self._get_conn()
-        try:
-            rows = conn.execute("SELECT * FROM proxy_servers ORDER BY id").fetchall()
+        with self._get_session() as session:
+            servers = session.exec(select(ProxyServer).order_by(ProxyServer.id)).all()
             result = []
-            for row in rows:
-                s = dict(row)
-                s['headers'] = json.loads(s['headers']) if s['headers'] else {}
-                counts = conn.execute(
-                    "SELECT COUNT(*) as total, SUM(enabled) as ena "
-                    "FROM proxy_tools WHERE server_id = ?",
-                    (s['id'],)
-                ).fetchone()
-                s['tool_count'] = counts['total'] or 0
-                s['enabled_tool_count'] = counts['ena'] or 0
+            for server in servers:
+                s = {
+                    "id": server.id,
+                    "name": server.name,
+                    "url": server.url,
+                    "transport": server.transport,
+                    "enabled": server.enabled,
+                    "description": server.description,
+                    "headers": json.loads(server.headers) if server.headers else {},
+                    "created_time": server.created_time,
+                    "last_sync": server.last_sync,
+                    "timeout": server.timeout
+                }
+                # 获取工具统计
+                tools = session.exec(
+                    select(ProxyTool).where(ProxyTool.server_id == server.id)
+                ).all()
+                total = len(tools)
+                enabled_count = sum(1 for t in tools if t.enabled)
+                s['tool_count'] = total
+                s['enabled_tool_count'] = enabled_count
                 result.append(s)
             return result
-        finally:
-            conn.close()
 
     def get_server_detail(self, server_id: int) -> Optional[dict]:
-        conn = self._get_conn()
-        try:
-            row = conn.execute(
-                "SELECT * FROM proxy_servers WHERE id = ?", (server_id,)
-            ).fetchone()
-            if not row:
+        with self._get_session() as session:
+            server = session.exec(
+                select(ProxyServer).where(ProxyServer.id == server_id)
+            ).first()
+            if not server:
                 return None
-            s = dict(row)
-            s['headers'] = json.loads(s['headers']) if s['headers'] else {}
 
-            tools = conn.execute(
-                "SELECT * FROM proxy_tools WHERE server_id = ? ORDER BY raw_name",
-                (server_id,)
-            ).fetchall()
+            s = {
+                "id": server.id,
+                "name": server.name,
+                "url": server.url,
+                "transport": server.transport,
+                "enabled": server.enabled,
+                "description": server.description,
+                "headers": json.loads(server.headers) if server.headers else {},
+                "created_time": server.created_time,
+                "last_sync": server.last_sync,
+                "timeout": server.timeout
+            }
+
+            tools = session.exec(
+                select(ProxyTool).where(ProxyTool.server_id == server_id).order_by(ProxyTool.raw_name)
+            ).all()
             s['tools'] = []
             for t in tools:
-                td = dict(t)
-                td['input_schema'] = json.loads(td['input_schema']) if td['input_schema'] else {}
-                s['tools'].append(td)
+                s['tools'].append({
+                    "id": t.id,
+                    "server_id": t.server_id,
+                    "raw_name": t.raw_name,
+                    "description": t.description,
+                    "custom_desc": t.custom_desc,
+                    "input_schema": json.loads(t.input_schema) if t.input_schema else {},
+                    "enabled": t.enabled
+                })
             return s
-        finally:
-            conn.close()
 
     def add_server(self, name: str, url: str, transport: str = 'streamable-http',
                    description: str = '', headers: dict = None, timeout: int = 60) -> dict:
-        conn = self._get_conn()
-        try:
-            created_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            conn.execute("""
-                INSERT INTO proxy_servers (name, url, transport, enabled, description, headers, created_time, timeout)
-                VALUES (?, ?, ?, 0, ?, ?, ?, ?)
-            """, (name, url, transport, description,
-                  json.dumps(headers or {}, ensure_ascii=False), created_time, timeout))
-            conn.commit()
-            server_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-            return {"success": True, "message": f"服务器 {name} 添加成功", "server_id": server_id}
-        except Exception as e:
-            return {"success": False, "message": f"添加失败: {str(e)}"}
-        finally:
-            conn.close()
+        with self._get_session() as session:
+            try:
+                created_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                server = ProxyServer(
+                    name=name,
+                    url=url,
+                    transport=transport,
+                    enabled=0,
+                    description=description,
+                    headers=json.dumps(headers or {}, ensure_ascii=False),
+                    created_time=created_time,
+                    timeout=timeout
+                )
+                session.add(server)
+                session.commit()
+                session.refresh(server)
+
+                # 自动加入默认分组
+                if self._group_manager:
+                    try:
+                        self._group_manager.add_proxy_to_default_group(server.id)
+                    except Exception as e:
+                        app_logger.warning(f"代理服务器 {name} 加入默认分组失败: {e}")
+
+                return {"success": True, "message": f"服务器 {name} 添加成功", "server_id": server.id}
+            except Exception as e:
+                return {"success": False, "message": f"添加失败: {str(e)}"}
 
     def update_server(self, server_id: int, name: str = None, url: str = None,
                       transport: str = None, description: str = None,
                       headers: dict = None, timeout: int = None) -> dict:
-        conn = self._get_conn()
-        try:
-            row = conn.execute(
-                "SELECT * FROM proxy_servers WHERE id = ?", (server_id,)
-            ).fetchone()
-            if not row:
-                return {"success": False, "message": "服务器不存在"}
+        with self._get_session() as session:
+            try:
+                server = session.exec(
+                    select(ProxyServer).where(ProxyServer.id == server_id)
+                ).first()
+                if not server:
+                    return {"success": False, "message": "服务器不存在"}
 
-            new_name = name if name is not None else row['name']
-            new_url = url if url is not None else row['url']
-            new_transport = transport if transport is not None else row['transport']
-            new_desc = description if description is not None else row['description']
-            new_headers = (json.dumps(headers, ensure_ascii=False)
-                           if headers is not None else row['headers'])
-            new_timeout = timeout if timeout is not None else (row['timeout'] or 60)
+                if name is not None:
+                    server.name = name
+                if url is not None:
+                    server.url = url
+                if transport is not None:
+                    server.transport = transport
+                if description is not None:
+                    server.description = description
+                if headers is not None:
+                    server.headers = json.dumps(headers, ensure_ascii=False)
+                if timeout is not None:
+                    server.timeout = timeout
 
-            conn.execute("""
-                UPDATE proxy_servers
-                SET name=?, url=?, transport=?, description=?, headers=?, timeout=?
-                WHERE id=?
-            """, (new_name, new_url, new_transport, new_desc, new_headers, new_timeout, server_id))
-            conn.commit()
+                session.add(server)
+                session.commit()
 
-            # 同步更新内存
-            if server_id in self._servers:
-                s = self._servers[server_id]
-                s.name = new_name
-                s.url = new_url
-                s.transport = new_transport
-                s.description = new_desc
-                s.headers = json.loads(new_headers) if isinstance(new_headers, str) else (new_headers or {})
-                s.timeout = new_timeout
+                # 同步更新内存
+                if server_id in self._servers:
+                    s = self._servers[server_id]
+                    s.name = server.name
+                    s.url = server.url
+                    s.transport = server.transport
+                    s.description = server.description
+                    s.headers = json.loads(server.headers) if server.headers else {}
+                    s.timeout = server.timeout
 
-            return {"success": True, "message": "服务器配置已更新"}
-        except Exception as e:
-            return {"success": False, "message": f"更新失败: {str(e)}"}
-        finally:
-            conn.close()
+                return {"success": True, "message": "服务器配置已更新"}
+            except Exception as e:
+                return {"success": False, "message": f"更新失败: {str(e)}"}
 
     def delete_server(self, server_id: int) -> dict:
-        conn = self._get_conn()
-        try:
-            row = conn.execute(
-                "SELECT * FROM proxy_servers WHERE id = ?", (server_id,)
-            ).fetchone()
-            if not row:
-                return {"success": False, "message": "服务器不存在"}
+        with self._get_session() as session:
+            try:
+                server = session.exec(
+                    select(ProxyServer).where(ProxyServer.id == server_id)
+                ).first()
+                if not server:
+                    return {"success": False, "message": "服务器不存在"}
 
-            self._unregister_server_tools(server_id)
-            conn.execute("DELETE FROM proxy_servers WHERE id = ?", (server_id,))
-            conn.commit()
-            self._servers.pop(server_id, None)
-            return {"success": True, "message": "服务器已删除"}
-        except Exception as e:
-            return {"success": False, "message": f"删除失败: {str(e)}"}
-        finally:
-            conn.close()
+                self._unregister_server_tools(server_id)
+
+                # 清理分组关联
+                from db.models.group import ProxyGroupLink
+                links = session.exec(
+                    select(ProxyGroupLink).where(ProxyGroupLink.server_id == server_id)
+                ).all()
+                for link in links:
+                    session.delete(link)
+
+                session.delete(server)
+                session.commit()
+                self._servers.pop(server_id, None)
+                return {"success": True, "message": "服务器已删除"}
+            except Exception as e:
+                return {"success": False, "message": f"删除失败: {str(e)}"}
 
     # ================================================================
     #  同步工具列表（异步）
@@ -434,34 +442,30 @@ class ProxyManager:
 
     async def sync_server(self, server_id: int) -> dict:
         """连接远端服务器并同步工具列表到数据库（不自动启用）"""
-        conn = self._get_conn()
-        try:
-            row = conn.execute(
-                "SELECT * FROM proxy_servers WHERE id = ?", (server_id,)
-            ).fetchone()
-            if not row:
+        with self._get_session() as session:
+            server = session.exec(
+                select(ProxyServer).where(ProxyServer.id == server_id)
+            ).first()
+            if not server:
                 return {"success": False, "message": "服务器不存在"}
-            url = row['url']
-            transport = row['transport']
-            headers = json.loads(row['headers']) if row['headers'] else {}
-            server_name = row['name']
-            timeout = row['timeout'] or 60
-        finally:
-            conn.close()
+            url = server.url
+            transport = server.transport
+            headers = json.loads(server.headers) if server.headers else {}
+            timeout = server.timeout or 60
 
         try:
             tools = await self._discover_tools(url, transport, headers, timeout)
         except Exception as e:
             return {"success": False, "message": f"连接失败: {str(e)}"}
 
-        conn = self._get_conn()
-        try:
+        with self._get_session() as session:
             sync_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            existing_raw = {
-                r['raw_name'] for r in conn.execute(
-                    "SELECT raw_name FROM proxy_tools WHERE server_id = ?", (server_id,)
-                ).fetchall()
-            }
+
+            # 获取已存在的工具 raw_name
+            existing_tools = session.exec(
+                select(ProxyTool).where(ProxyTool.server_id == server_id)
+            ).all()
+            existing_raw = {t.raw_name for t in existing_tools}
 
             new_count = 0
             for tool in tools:
@@ -470,25 +474,31 @@ class ProxyManager:
                 input_schema = json.dumps(tool['inputSchema'], ensure_ascii=False)
 
                 if raw_name not in existing_raw:
-                    conn.execute("""
-                        INSERT INTO proxy_tools
-                            (server_id, raw_name, description, input_schema, enabled)
-                        VALUES (?, ?, ?, ?, 1)
-                    """, (server_id, raw_name, description, input_schema))
+                    new_tool = ProxyTool(
+                        server_id=server_id,
+                        raw_name=raw_name,
+                        description=description,
+                        input_schema=input_schema,
+                        enabled=1
+                    )
+                    session.add(new_tool)
                     new_count += 1
                 else:
                     # 仅更新描述和 schema，保留用户设置的 enabled 和 custom_desc
-                    conn.execute("""
-                        UPDATE proxy_tools SET description=?, input_schema=?
-                        WHERE server_id=? AND raw_name=?
-                    """, (description, input_schema, server_id, raw_name))
+                    existing_tool = next(t for t in existing_tools if t.raw_name == raw_name)
+                    existing_tool.description = description
+                    existing_tool.input_schema = input_schema
+                    session.add(existing_tool)
 
-            conn.execute(
-                "UPDATE proxy_servers SET last_sync=? WHERE id=?", (sync_time, server_id)
-            )
-            conn.commit()
-        finally:
-            conn.close()
+            # 更新同步时间
+            server = session.exec(
+                select(ProxyServer).where(ProxyServer.id == server_id)
+            ).first()
+            if server:
+                server.last_sync = sync_time
+                session.add(server)
+
+            session.commit()
 
         return {
             "success": True,
@@ -499,48 +509,53 @@ class ProxyManager:
 
     async def force_sync_server(self, server_id: int) -> dict:
         """覆盖同步：删除该服务器所有已有工具，重新从远端拉取并写入（不保留用户配置）"""
-        conn = self._get_conn()
-        try:
-            row = conn.execute(
-                "SELECT * FROM proxy_servers WHERE id = ?", (server_id,)
-            ).fetchone()
-            if not row:
+        with self._get_session() as session:
+            server = session.exec(
+                select(ProxyServer).where(ProxyServer.id == server_id)
+            ).first()
+            if not server:
                 return {"success": False, "message": "服务器不存在"}
-            url = row['url']
-            transport = row['transport']
-            headers = json.loads(row['headers']) if row['headers'] else {}
-            server_name = row['name']
-            timeout = row['timeout'] or 60
-        finally:
-            conn.close()
+            url = server.url
+            transport = server.transport
+            headers = json.loads(server.headers) if server.headers else {}
+            timeout = server.timeout or 60
 
         try:
             tools = await self._discover_tools(url, transport, headers, timeout)
         except Exception as e:
             return {"success": False, "message": f"连接失败: {str(e)}"}
 
-        conn = self._get_conn()
-        try:
+        with self._get_session() as session:
             # 删除该服务器所有已有工具
-            conn.execute("DELETE FROM proxy_tools WHERE server_id = ?", (server_id,))
+            existing_tools = session.exec(
+                select(ProxyTool).where(ProxyTool.server_id == server_id)
+            ).all()
+            for t in existing_tools:
+                session.delete(t)
 
             sync_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             for tool in tools:
                 raw_name = tool['name']
                 description = tool['description']
                 input_schema = json.dumps(tool['inputSchema'], ensure_ascii=False)
-                conn.execute("""
-                    INSERT INTO proxy_tools
-                        (server_id, raw_name, description, input_schema, enabled)
-                    VALUES (?, ?, ?, ?, 1)
-                """, (server_id, raw_name, description, input_schema))
+                new_tool = ProxyTool(
+                    server_id=server_id,
+                    raw_name=raw_name,
+                    description=description,
+                    input_schema=input_schema,
+                    enabled=1
+                )
+                session.add(new_tool)
 
-            conn.execute(
-                "UPDATE proxy_servers SET last_sync=? WHERE id=?", (sync_time, server_id)
-            )
-            conn.commit()
-        finally:
-            conn.close()
+            # 更新同步时间
+            server = session.exec(
+                select(ProxyServer).where(ProxyServer.id == server_id)
+            ).first()
+            if server:
+                server.last_sync = sync_time
+                session.add(server)
+
+            session.commit()
 
         return {
             "success": True,
@@ -553,26 +568,36 @@ class ProxyManager:
     # ================================================================
 
     def enable_server(self, server_id: int) -> dict:
-        conn = self._get_conn()
-        try:
-            row = conn.execute(
-                "SELECT * FROM proxy_servers WHERE id = ?", (server_id,)
-            ).fetchone()
-            if not row:
+        with self._get_session() as session:
+            server = session.exec(
+                select(ProxyServer).where(ProxyServer.id == server_id)
+            ).first()
+            if not server:
                 return {"success": False, "message": "服务器不存在"}
 
-            server = ProxyServerInfo(**dict(row))
-            server.enabled = True
-            self._servers[server_id] = server
+            server_info = ProxyServerInfo(
+                id=server.id,
+                name=server.name,
+                url=server.url,
+                transport=server.transport,
+                enabled=True,
+                description=server.description,
+                headers=server.headers,
+                created_time=server.created_time,
+                last_sync=server.last_sync,
+                timeout=server.timeout
+            )
+            server_info.enabled = True
+            self._servers[server_id] = server_info
 
-            tools = conn.execute(
-                "SELECT * FROM proxy_tools WHERE server_id = ?", (server_id,)
-            ).fetchall()
+            tools = session.exec(
+                select(ProxyTool).where(ProxyTool.server_id == server_id)
+            ).all()
             count = 0
             for tool in tools:
-                schema = json.loads(tool['input_schema']) if tool['input_schema'] else {}
-                desc = tool['custom_desc'] or tool['description']
-                raw_name = tool['raw_name']
+                schema = json.loads(tool.input_schema) if tool.input_schema else {}
+                desc = tool.custom_desc or tool.description
+                raw_name = tool.raw_name
                 local_name = self._make_local_name(server.name, raw_name)
                 # 若已注册（可能已有），先移除再重注册
                 if local_name in self._proxy_tool_to_server:
@@ -583,7 +608,7 @@ class ProxyManager:
                     self.module_manager._tool_to_module.pop(local_name, None)
                     self._proxy_tool_to_server.pop(local_name, None)
                 self._register_proxy_tool_in_fastmcp(
-                    server, raw_name, local_name, desc, schema, bool(tool['enabled'])
+                    server_info, raw_name, local_name, desc, schema, bool(tool.enabled)
                 )
                 count += 1
 
@@ -596,7 +621,7 @@ class ProxyManager:
                 def make_factory(target_url):
                     return lambda: ProxyClient(target_url)
                 proxy_server = FastMCPProxy(
-                    client_factory=make_factory(server.url),
+                    client_factory=make_factory(server_info.url),
                 )
 
                 # 增加工具启用检查中间件
@@ -611,15 +636,13 @@ class ProxyManager:
                 self.mcp.mount(proxy_server)
                 self._mounted_proxies[name] = proxy_server
 
-            conn.execute("UPDATE proxy_servers SET enabled=1 WHERE id=?", (server_id,))
-            conn.commit()
+            server.enabled = 1
+            session.add(server)
+            session.commit()
             return {"success": True, "message": f"服务器已启用，注册了 {count} 个工具"}
-        finally:
-            conn.close()
 
     def disable_server(self, server_id: int) -> dict:
-        conn = self._get_conn()
-        try:
+        with self._get_session() as session:
             self._unregister_server_tools(server_id)
 
             # 实际卸载 FastMCPProxy
@@ -634,95 +657,95 @@ class ProxyManager:
                             break
                     del self._mounted_proxies[name]
 
-            conn.execute("UPDATE proxy_servers SET enabled=0 WHERE id=?", (server_id,))
-            conn.commit()
+            db_server = session.exec(
+                select(ProxyServer).where(ProxyServer.id == server_id)
+            ).first()
+            if db_server:
+                db_server.enabled = 0
+                session.add(db_server)
+                session.commit()
+
             self._servers.pop(server_id, None)
             return {"success": True, "message": "服务器已禁用"}
-        finally:
-            conn.close()
 
     # ================================================================
     #  工具启用 / 禁用 / 描述更新
     # ================================================================
 
     def enable_tool(self, tool_id: int) -> dict:
-        conn = self._get_conn()
-        try:
-            row = conn.execute(
-                "SELECT pt.*, ps.enabled as server_enabled "
-                "FROM proxy_tools pt JOIN proxy_servers ps ON pt.server_id = ps.id "
-                "WHERE pt.id = ?", (tool_id,)
-            ).fetchone()
-            if not row:
+        with self._get_session() as session:
+            tool = session.exec(
+                select(ProxyTool).where(ProxyTool.id == tool_id)
+            ).first()
+            if not tool:
                 return {"success": False, "message": "工具不存在"}
 
-            conn.execute("UPDATE proxy_tools SET enabled=1 WHERE id=?", (tool_id,))
-            conn.commit()
+            # 获取服务器状态
+            server = session.exec(
+                select(ProxyServer).where(ProxyServer.id == tool.server_id)
+            ).first()
 
-            raw_name = row['raw_name']
-            server = self._servers.get(row['server_id'])
-            local_name = self._make_local_name(server.name, raw_name) if server else None
-            if row['server_enabled'] and local_name:
+            tool.enabled = 1
+            session.add(tool)
+            session.commit()
+
+            raw_name = tool.raw_name
+            server_info = self._servers.get(tool.server_id)
+            local_name = self._make_local_name(server_info.name, raw_name) if server_info else None
+
+            if server and server.enabled and local_name:
                 tool_obj = self.mcp._tool_manager._tools.get(local_name)
                 if tool_obj:
                     tool_obj.enabled = True
-                elif server:
+                elif server_info:
                     # 工具不在 FastMCP 中，重新注册
-                    schema = json.loads(row['input_schema']) if row['input_schema'] else {}
-                    desc = row['custom_desc'] or row['description']
+                    schema = json.loads(tool.input_schema) if tool.input_schema else {}
+                    desc = tool.custom_desc or tool.description
                     self._register_proxy_tool_in_fastmcp(
-                        server, raw_name, local_name, desc, schema, True
+                        server_info, raw_name, local_name, desc, schema, True
                     )
             return {"success": True, "message": "工具已启用"}
-        finally:
-            conn.close()
 
     def disable_tool(self, tool_id: int) -> dict:
-        conn = self._get_conn()
-        try:
-            row = conn.execute(
-                "SELECT * FROM proxy_tools WHERE id=?", (tool_id,)
-            ).fetchone()
-            if not row:
+        with self._get_session() as session:
+            tool = session.exec(
+                select(ProxyTool).where(ProxyTool.id == tool_id)
+            ).first()
+            if not tool:
                 return {"success": False, "message": "工具不存在"}
 
-            raw_name = row['raw_name']
-            server = self._servers.get(row['server_id'])
-            local_name = self._make_local_name(server.name, raw_name) if server else None
+            raw_name = tool.raw_name
+            server_info = self._servers.get(tool.server_id)
+            local_name = self._make_local_name(server_info.name, raw_name) if server_info else None
             if local_name:
                 tool_obj = self.mcp._tool_manager._tools.get(local_name)
                 if tool_obj:
                     tool_obj.enabled = False
 
-            conn.execute("UPDATE proxy_tools SET enabled=0 WHERE id=?", (tool_id,))
-            conn.commit()
+            tool.enabled = 0
+            session.add(tool)
+            session.commit()
             return {"success": True, "message": "工具已禁用"}
-        finally:
-            conn.close()
 
     def update_tool_description(self, tool_id: int, description: str) -> dict:
-        conn = self._get_conn()
-        try:
-            row = conn.execute(
-                "SELECT * FROM proxy_tools WHERE id=?", (tool_id,)
-            ).fetchone()
-            if not row:
+        with self._get_session() as session:
+            tool = session.exec(
+                select(ProxyTool).where(ProxyTool.id == tool_id)
+            ).first()
+            if not tool:
                 return {"success": False, "message": "工具不存在"}
 
-            conn.execute(
-                "UPDATE proxy_tools SET custom_desc=? WHERE id=?", (description, tool_id)
-            )
-            conn.commit()
+            tool.custom_desc = description
+            session.add(tool)
+            session.commit()
 
             # 同步更新 FastMCP 工具描述
-            raw_name = row['raw_name']
-            server = self._servers.get(row['server_id'])
-            local_name = self._make_local_name(server.name, raw_name) if server else None
+            raw_name = tool.raw_name
+            server_info = self._servers.get(tool.server_id)
+            local_name = self._make_local_name(server_info.name, raw_name) if server_info else None
             if local_name:
                 tool_obj = self.mcp._tool_manager._tools.get(local_name)
                 if tool_obj:
                     tool_obj.description = description
 
             return {"success": True, "message": "工具描述已更新"}
-        finally:
-            conn.close()

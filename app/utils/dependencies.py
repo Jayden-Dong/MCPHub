@@ -7,7 +7,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlmodel import Session, select
 
 from utils.auth import verify_token
-from models.user import User
+from config_py.config import settings
 from config_py.config import settings
 
 security = HTTPBearer(auto_error=False)

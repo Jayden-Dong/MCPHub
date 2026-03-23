@@ -1,22 +1,10 @@
 """
-用户数据库模型
+用户相关的 Pydantic 模型（用于 API 请求/响应）
+数据库模型请使用 db.models.user.User
 """
 from datetime import datetime
 from sqlmodel import Field, SQLModel
 from typing import Optional
-
-
-class User(SQLModel, table=True):
-    """用户表"""
-    __tablename__ = "users"
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    username: str = Field(max_length=50, unique=True, index=True, nullable=False)
-    password_hash: str = Field(max_length=255, nullable=False)
-    role: str = Field(default="user", max_length=20)  # admin / user
-    is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    last_login: Optional[datetime] = Field(default=None)
 
 
 class UserCreate(SQLModel):

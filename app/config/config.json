@@ -60,7 +60,9 @@
           "max_steps": 50,
           "screenshot_delay": 1.0,
           "llm_temperature": 0.1,
-          "llm_max_tokens": 1024
+          "llm_max_tokens": 1024,
+          "gui_mode": "local",
+          "remote_gui_url": "http://172.16.226.212:8765"
         }
       },
       {

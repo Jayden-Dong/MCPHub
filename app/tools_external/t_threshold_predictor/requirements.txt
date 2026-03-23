@@ -1,0 +1,5 @@
+pandas
+numpy
+joblib
+pydantic
+fastmcp
